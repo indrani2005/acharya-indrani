@@ -37,6 +37,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    #user apps
+    "users",
+    "admissions",
+    "students",
+    "parents",
+    "staff",
+    "fees",
+    "attendance",
+    "exams",
+    "hostel",
+    "library",
+    "notifications",
+    "reports",
+    "analytics",
 ]
 
 MIDDLEWARE = [
@@ -48,6 +62,16 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
 
 ROOT_URLCONF = 'config.urls'
 
