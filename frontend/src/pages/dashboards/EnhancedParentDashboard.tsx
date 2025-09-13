@@ -129,7 +129,7 @@ const EnhancedParentDashboard = () => {
         return; 
       }
 
-      setUser({ id: authUser.id, email: authUser.email });
+      setUser({ id: authUser.id.toString(), email: authUser.email });
 
       // Mock profile data for parent - in real implementation, fetch from Django API
       const profileData = {
