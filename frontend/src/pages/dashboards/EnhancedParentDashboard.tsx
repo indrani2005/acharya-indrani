@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import EnhancedDashboardLayout from "@/components/EnhancedDashboardLayout";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { 
   Users, 
@@ -122,16 +122,21 @@ const EnhancedParentDashboard = () => {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/auth"); return; }
+      // Use the auth context instead of Supabase
+      const authUser = useAuth().user;
+      if (!authUser) { 
+        navigate("/auth"); 
+        return; 
+      }
 
-      setUser({ id: session.user.id, email: session.user.email ?? "" });
+      setUser({ id: authUser.id, email: authUser.email });
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
+      // Mock profile data for parent - in real implementation, fetch from Django API
+      const profileData = {
+        full_name: `${authUser.first_name} ${authUser.last_name}`.trim() || authUser.email,
+        role: authUser.role || 'parent',
+        parent_of_student_id: childData.studentId
+      };
 
       setProfile(profileData as MockProfile);
     } catch (error) {

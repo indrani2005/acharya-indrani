@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import StudentDashboard from "./dashboards/StudentDashboard";
 import ParentDashboard from "./dashboards/ParentDashboard";
 import FacultyDashboard from "./dashboards/FacultyDashboard";
@@ -8,103 +8,57 @@ import WardenDashboard from "./dashboards/WardenDashboard";
 import AdminDashboard from "./dashboards/AdminDashboard";
 
 const Dashboard = () => {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      // Check for mock user first (for demo purposes)
-      const mockUser = localStorage.getItem('mockUser');
-      if (mockUser) {
-        const userData = JSON.parse(mockUser);
-        setUser({ id: userData.id, email: userData.email });
-        setProfile({ 
-          full_name: userData.full_name, 
-          role: userData.role,
-          user_id: userData.id 
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Regular Supabase auth check
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-
-      setUser(session.user);
-      
-      // Fetch user profile to determine role
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        // If no profile exists, redirect to auth to complete setup
-        navigate("/auth");
-      } else {
-        setProfile(profileData);
-      }
-    } catch (error) {
-      console.error('Auth error:', error);
+    if (!isLoading && !isAuthenticated) {
       navigate("/auth");
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [isAuthenticated, isLoading, navigate]);
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
-  if (!profile) {
+  if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-foreground mb-2">Profile Not Found</h2>
-          <p className="text-muted-foreground">Please complete your registration.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
+          <p className="mt-2 text-gray-600">Please log in to access your dashboard.</p>
         </div>
       </div>
     );
   }
 
-  // Render appropriate dashboard based on user role
-  switch (profile.role) {
-    case 'student':
+  // Route to appropriate dashboard based on user role
+  switch (user.role) {
+    case "student":
       return <StudentDashboard />;
-    case 'parent':
+    case "parent":
       return <ParentDashboard />;
-    case 'faculty':
+    case "faculty":
       return <FacultyDashboard />;
-    case 'warden':
+    case "warden":
       return <WardenDashboard />;
-    case 'admin':
+    case "admin":
       return <AdminDashboard />;
     default:
       return (
-        <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-bold text-foreground mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">Your role is not recognized in the system.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Unknown Role</h1>
+            <p className="mt-2 text-gray-600">
+              Your account role ({user.role}) is not recognized. Please contact support.
+            </p>
           </div>
         </div>
       );
