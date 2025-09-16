@@ -19,10 +19,10 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -30,10 +30,10 @@ const Dashboard = () => {
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="mt-2 text-gray-600">Please log in to access your dashboard.</p>
+          <h2 className="text-xl font-bold text-foreground mb-2">Access Denied</h2>
+          <p className="text-muted-foreground">Please log in to access your dashboard.</p>
         </div>
       </div>
     );
@@ -53,11 +53,11 @@ const Dashboard = () => {
       return <AdminDashboard />;
     default:
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen rajasthan-pattern flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">Unknown Role</h1>
-            <p className="mt-2 text-gray-600">
-              Your account role ({user.role}) is not recognized. Please contact support.
+            <h2 className="text-xl font-bold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">
+              Your role ({user.role}) is not recognized in the system.
             </p>
           </div>
         </div>

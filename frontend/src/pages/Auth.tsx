@@ -32,10 +32,17 @@ const Auth = () => {
     email: "",
     password: "",
   });
+  const [now, setNow] = useState<Date>(new Date());
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Update clock every second
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -43,6 +50,19 @@ const Auth = () => {
       navigate("/dashboard");
     }
   }, [isAuthenticated, authLoading, navigate]);
+
+  // Format current time for IST display
+  const istString = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(now);
 
   const roleOptions = [
     {
@@ -93,52 +113,39 @@ const Auth = () => {
   ];
 
   const handleRoleSelect = (role: any) => {
-    if (role.hasSubOptions) {
+    if (role?.hasSubOptions) {
       setShowStaffOptions(true);
       return;
     }
 
-    setCurrentRole(role.id);
-    setCurrentRoleName(role.name);
+    setCurrentRole(role?.id || "");
+    setCurrentRoleName(role?.name || "");
     setShowLoginForm(true);
-    
+    setShowStaffOptions(false);
+
     // Pre-fill demo credentials
-    if (role.demoCredentials) {
+    if (role?.demoCredentials) {
       setFormData(role.demoCredentials);
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.email || !formData.password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
-    
+
     try {
       await login(formData.email, formData.password);
-      // Navigation will be handled by the useEffect hook
-    } catch (error: any) {
+      toast({
+        title: "Success!",
+        description: `Welcome to your ${currentRoleName} dashboard`,
+      });
+      // Navigation happens automatically via useEffect
+    } catch (error) {
       console.error("Login error:", error);
       // Error toast is handled in the AuthContext
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleUseDemoCredentials = (credentials: { email: string; password: string }) => {
-    setFormData(credentials);
-    toast({
-      title: "Demo Credentials Loaded",
-      description: "Click Login to proceed with demo account",
-    });
   };
 
   const resetToRoleSelection = () => {
@@ -151,211 +158,228 @@ const Auth = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
         <div className="text-center">
-          <Clock className="mx-auto h-8 w-8 animate-spin text-blue-600 mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <Clock className="mx-auto h-8 w-8 animate-spin text-amber-600 mb-4" />
+          <p className="text-amber-800">Loading...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-            <GraduationCap className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Acharya Portal</h1>
-          <p className="text-gray-600">
-            {showLoginForm 
-              ? `Sign in to your ${currentRoleName} account`
-              : "Select your role to continue"
-            }
-          </p>
-        </div>
-
-        {/* Login Form */}
-        {showLoginForm && (
-          <Card className="w-full shadow-lg border-0">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-                {currentRole === "student" && <GraduationCap className="h-6 w-6 text-blue-600" />}
-                {currentRole === "parent" && <Users className="h-6 w-6 text-blue-600" />}
-                {currentRole === "faculty" && <BookOpen className="h-6 w-6 text-blue-600" />}
-                {currentRole === "warden" && <Building className="h-6 w-6 text-blue-600" />}
-                {currentRole === "admin" && <Settings className="h-6 w-6 text-blue-600" />}
+  // Login Form View
+  if (showLoginForm) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card className="shadow-xl">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-amber-500 to-rose-500">
+                  <GraduationCap className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <CardTitle className="text-xl">{currentRoleName} Login</CardTitle>
-              <CardDescription>
-                Enter your credentials to access your dashboard
-              </CardDescription>
+              <CardTitle className="text-2xl">{currentRoleName} Login</CardTitle>
+              <CardDescription>Enter your credentials to access the portal</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full"
-                    required
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="Enter your email" 
+                    value={formData.email} 
+                    onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                    required 
                   />
                 </div>
-                
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full pr-10"
-                      required
+                    <Input 
+                      id="password" 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Enter your password" 
+                      value={formData.password} 
+                      onChange={(e) => setFormData({...formData, password: e.target.value})} 
+                      required 
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" 
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-4" />)}
                     </Button>
                   </div>
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full" onClick={resetToRoleSelection}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Role Selection
+                  </Button>
+                </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-              {/* Demo Credentials */}
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => handleUseDemoCredentials(formData)}
-                >
-                  <FileText className="mr-1 h-3 w-3" />
-                  Use Demo Account
-                </Button>
+  // Main Role Selection View
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-amber-200">
+              <GraduationCap className="h-12 w-12 text-amber-600" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold text-amber-900 mb-2">Acharya Education Portal</h1>
+          <p className="text-amber-800/80 text-lg">Government of Rajasthan</p>
+          <p className="text-amber-800/70 text-sm mt-1">शिक्षा विभाग | Education Department</p>
+          <div className="mt-4 inline-flex items-center gap-2 bg-amber-100 rounded-full px-5 py-2 ring-1 ring-amber-200">
+            <Clock className="h-4 w-4 text-amber-700" />
+            <span className="text-amber-900 text-base font-mono">{istString}</span>
+          </div>
+        </div>
+
+        {/* Role Selection Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-2 hover:border-amber-400 bg-white/90">
+            <CardContent className="p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <BookOpen className="h-8 w-8 text-white" />
+                </div>
               </div>
-
-              <Button
-                variant="ghost"
-                className="w-full mt-4"
-                onClick={resetToRoleSelection}
+              <h3 className="text-xl font-bold mb-2 text-amber-900">Student</h3>
+              <p className="text-amber-800/80 text-sm mb-4">Access your academic records, attendance, and course materials</p>
+              <Button 
+                className="w-full" 
+                onClick={() => handleRoleSelect(roleOptions.find(r => r.id === 'student'))} 
+                disabled={isLoading}
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Role Selection
+                {isLoading ? "Loading..." : "Enter Portal"}
               </Button>
             </CardContent>
           </Card>
-        )}
 
-        {/* Staff Sub-options */}
-        {showStaffOptions && !showLoginForm && (
-          <Card className="w-full shadow-lg border-0">
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">Select Staff Role</CardTitle>
-              <CardDescription>Choose your specific staff role</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {staffSubOptions.map((option) => {
-                const Icon = option.icon;
-                return (
-                  <Button
-                    key={option.id}
-                    variant="outline"
-                    className="w-full h-auto p-4 justify-start text-left hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                    onClick={() => handleRoleSelect(option)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div className="flex-grow text-left">
-                        <h3 className="font-medium text-gray-900">{option.name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{option.description}</p>
-                      </div>
-                    </div>
-                  </Button>
-                );
-              })}
-              
-              <Button
-                variant="ghost"
-                className="w-full mt-4"
-                onClick={() => setShowStaffOptions(false)}
+          <Card className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-2 hover:border-amber-400 bg-white/90">
+            <CardContent className="p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Users className="h-8 w-8 text-white" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-amber-900">Staff</h3>
+              <p className="text-amber-800/80 text-sm mb-4">Faculty, Warden, and Management access</p>
+              <Button 
+                className="w-full" 
+                onClick={() => setShowStaffOptions(true)} 
+                disabled={isLoading}
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                Select Role
               </Button>
             </CardContent>
           </Card>
-        )}
 
-        {/* Role Selection */}
-        {!showLoginForm && !showStaffOptions && (
-          <Card className="w-full shadow-lg border-0">
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">Select Your Role</CardTitle>
-              <CardDescription>Choose how you want to access the system</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {roleOptions.map((option) => {
-                const Icon = option.icon;
-                return (
-                  <Button
-                    key={option.id}
-                    variant="outline"
-                    className="w-full h-auto p-4 justify-start text-left hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                    onClick={() => handleRoleSelect(option)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div className="flex-grow text-left">
-                        <h3 className="font-medium text-gray-900">{option.name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{option.description}</p>
-                      </div>
-                    </div>
-                  </Button>
-                );
-              })}
+          <Card className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-2 hover:border-amber-400 bg-white/90">
+            <CardContent className="p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <UserCheck className="h-8 w-8 text-white" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-amber-900">Parent</h3>
+              <p className="text-amber-800/80 text-sm mb-4">Monitor your child's academic progress and fees</p>
+              <Button 
+                className="w-full" 
+                onClick={() => handleRoleSelect(roleOptions.find(r => r.id === 'parent'))} 
+                disabled={isLoading}
+              >
+                {isLoading ? "Loading..." : "Enter Portal"}
+              </Button>
             </CardContent>
           </Card>
+
+          <Card className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-2 hover:border-amber-400 bg-white/90">
+            <CardContent className="p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileText className="h-8 w-8 text-white" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-amber-900">Admission</h3>
+              <p className="text-amber-800/80 text-sm mb-4">Apply for admission and track application status</p>
+              <Button 
+                className="w-full" 
+                onClick={() => navigate('/admission')} 
+                disabled={isLoading}
+              >
+                {isLoading ? "Loading..." : "Apply Now"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Staff Sub-roles Modal */}
+        {showStaffOptions && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="h-5 w-5" />
+                  <span>Select Staff Role</span>
+                </CardTitle>
+                <CardDescription>Choose your specific role to continue</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button className="w-full justify-start h-16" variant="outline" onClick={() => handleRoleSelect(staffSubOptions.find(s => s.id === 'faculty'))}>
+                  <BookOpen className="h-6 w-6 mr-3" />
+                  <div className="text-left">
+                    <p className="font-medium">Faculty</p>
+                    <p className="text-sm text-muted-foreground">Teaching staff and subject experts</p>
+                  </div>
+                </Button>
+                <Button className="w-full justify-start h-16" variant="outline" onClick={() => handleRoleSelect(staffSubOptions.find(s => s.id === 'warden'))}>
+                  <Building className="h-6 w-6 mr-3" />
+                  <div className="text-left">
+                    <p className="font-medium">Warden</p>
+                    <p className="text-sm text-muted-foreground">Hostel and residential management</p>
+                  </div>
+                </Button>
+                <Button className="w-full justify-start h-16" variant="outline" onClick={() => handleRoleSelect(staffSubOptions.find(s => s.id === 'admin'))}>
+                  <Settings className="h-6 w-6 mr-3" />
+                  <div className="text-left">
+                    <p className="font-medium">Manager</p>
+                    <p className="text-sm text-muted-foreground">Administrative and management roles</p>
+                  </div>
+                </Button>
+                <Button className="w-full mt-4" variant="ghost" onClick={() => setShowStaffOptions(false)}>Cancel</Button>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* Demo Notice */}
-        <div className="text-center text-sm text-gray-500">
-          <p>This is a demo system. Use the provided demo credentials to explore.</p>
+        {/* Government Branding Footer */}
+        <div className="text-center">
+          <div className="inline-flex items-center space-x-4 bg-amber-100 rounded-lg px-6 py-3 ring-1 ring-amber-200">
+            <Shield className="h-6 w-6 text-amber-700" />
+            <div className="text-amber-900 text-sm">
+              <p className="font-medium">राजस्थान सरकार | Government of Rajasthan</p>
+              <p className="text-amber-800/70">Secure Portal • आधिकारिक पोर्टल</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

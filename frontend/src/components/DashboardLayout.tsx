@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet,
   SheetContent,
@@ -20,16 +21,20 @@ interface DashboardLayoutProps {
 const DashboardLayout = ({ children, title, user, profile, sidebarContent }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { logout } = useAuth();
 
-  const handleSignOut = () => {
-    // Clear mock user data
-    localStorage.removeItem('mockUser');
-    
-    toast({
-      title: "Logged out successfully",
-      description: "You have been signed out of your account.",
-    });
-    navigate("/auth");
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout Failed",
+        description: "There was an error logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -66,8 +71,8 @@ const DashboardLayout = ({ children, title, user, profile, sidebarContent }: Das
           </div>
           <div className="flex items-center space-x-6">
             <div className="text-right hidden sm:block">
-              <p className="font-semibold text-white text-lg">{profile?.full_name || user?.email}</p>
-              <p className="text-sm text-white/80 capitalize">{profile?.role || 'User'}</p>
+              <p className="font-semibold text-white text-lg">{user?.first_name} {user?.last_name}</p>
+              <p className="text-sm text-white/80 capitalize">{user?.role}</p>
             </div>
             <Button 
               variant="ghost" 

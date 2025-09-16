@@ -30,23 +30,78 @@ class UserAdmin(BaseUserAdmin):
 class StudentProfileAdmin(admin.ModelAdmin):
     """Admin configuration for StudentProfile"""
     
-    list_display = ['admission_number', 'user', 'course', 'semester', 'is_hostelite']
-    list_filter = ['course', 'semester', 'is_hostelite']
-    search_fields = ['admission_number', 'user__first_name', 'user__last_name', 'user__email']
-    readonly_fields = ['admission_number']
+    list_display = ['admission_number', 'full_name', 'school', 'user', 'course', 'semester', 'is_active', 'is_hostelite']
+    list_filter = ['school', 'course', 'semester', 'is_active', 'is_hostelite']
+    search_fields = ['admission_number', 'first_name', 'last_name', 'user__email']
+    readonly_fields = ['admission_number', 'user']
+    actions = ['activate_students', 'deactivate_students']
+    
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('first_name', 'last_name', 'admission_number', 'date_of_birth')
+        }),
+        ('Academic Information', {
+            'fields': ('school', 'course', 'department', 'semester', 'roll_number')
+        }),
+        ('Contact Information', {
+            'fields': ('address', 'emergency_contact')
+        }),
+        ('Status', {
+            'fields': ('is_active', 'is_hostelite', 'user')
+        }),
+    )
+    
+    def full_name(self, obj):
+        return obj.full_name
+    full_name.short_description = 'Full Name'
+    
+    def activate_students(self, request, queryset):
+        """Admin action to activate selected students"""
+        count = 0
+        for student in queryset.filter(is_active=False):
+            if not student.school:
+                self.message_user(request, f'Cannot activate student {student.admission_number}: No school assigned.', level='ERROR')
+                continue
+            student.is_active = True
+            student.save()
+            count += 1
+        self.message_user(request, f'{count} students activated successfully.')
+    activate_students.short_description = 'Activate selected students'
+    
+    def deactivate_students(self, request, queryset):
+        """Admin action to deactivate selected students"""
+        count = 0
+        for student in queryset.filter(is_active=True):
+            student.is_active = False
+            student.save()
+            count += 1
+        self.message_user(request, f'{count} students deactivated successfully.')
+    deactivate_students.short_description = 'Deactivate selected students'
 
 
 @admin.register(ParentProfile)
 class ParentProfileAdmin(admin.ModelAdmin):
     """Admin configuration for ParentProfile"""
     
-    list_display = ['user', 'occupation', 'children_count']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email']
-    filter_horizontal = ['children']
+    list_display = ['full_name', 'relationship', 'student', 'phone_number', 'is_primary_contact']
+    list_filter = ['relationship', 'is_primary_contact', 'student__school']
+    search_fields = ['first_name', 'last_name', 'phone_number', 'student__admission_number', 'student__first_name', 'student__last_name']
     
-    def children_count(self, obj):
-        return obj.children.count()
-    children_count.short_description = 'Number of Children'
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('first_name', 'last_name', 'phone_number', 'email', 'occupation')
+        }),
+        ('Relationship', {
+            'fields': ('student', 'relationship', 'is_primary_contact')
+        }),
+        ('Address', {
+            'fields': ('address',)
+        }),
+    )
+    
+    def full_name(self, obj):
+        return obj.full_name
+    full_name.short_description = 'Full Name'
 
 
 @admin.register(StaffProfile)

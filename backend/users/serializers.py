@@ -46,12 +46,24 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
 class ParentProfileSerializer(serializers.ModelSerializer):
     """Serializer for ParentProfile"""
-    user = UserSerializer(read_only=True)
-    children = StudentProfileSerializer(many=True, read_only=True)
+    student = StudentProfileSerializer(read_only=True)
+    full_name = serializers.ReadOnlyField()
     
     class Meta:
         model = ParentProfile
         fields = '__all__'
+
+
+class StudentDashboardSerializer(serializers.ModelSerializer):
+    """Serializer for student data in parent dashboard - restricted fields"""
+    full_name = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = StudentProfile
+        fields = [
+            'id', 'admission_number', 'full_name', 'course', 'department', 
+            'semester', 'is_hostelite', 'first_name', 'last_name'
+        ]
 
 
 class StaffProfileSerializer(serializers.ModelSerializer):
