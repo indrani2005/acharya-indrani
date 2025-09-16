@@ -13,6 +13,9 @@ class AdmissionApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
     
+    # School Information
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
+    
     # Personal Information
     applicant_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
@@ -41,5 +44,13 @@ class AdmissionApplication(models.Model):
     # Documents (JSON field to store document paths)
     documents = models.JSONField(default=dict, blank=True)
     
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', 'status']),
+            models.Index(fields=['school', 'application_date']),
+            models.Index(fields=['course_applied', 'status']),
+        ]
+    
     def __str__(self):
-        return f"{self.applicant_name} - {self.course_applied} ({self.status})"
+        school_name = self.school.school_name if self.school else "No School"
+        return f"{self.applicant_name} - {self.course_applied} ({self.status}) [{school_name}]"

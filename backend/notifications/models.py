@@ -21,6 +21,7 @@ class Notice(models.Model):
         ('staff', 'Staff'),
     ]
     
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=200)
     content = models.TextField()
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
@@ -32,8 +33,15 @@ class Notice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', 'priority']),
+            models.Index(fields=['school', 'publish_date']),
+            models.Index(fields=['school', 'is_active']),
+        ]
+    
     def __str__(self):
-        return self.title
+        return f"{self.title} [{self.school.school_name}]"
 
 
 class UserNotification(models.Model):
@@ -45,6 +53,10 @@ class UserNotification(models.Model):
     
     class Meta:
         unique_together = ['user', 'notice']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['notice', 'is_read']),
+        ]
     
     def __str__(self):
-        return f"{self.user.email} - {self.notice.title}"
+        return f"{self.user.email} - {self.notice.title} [{self.notice.school.school_name}]"

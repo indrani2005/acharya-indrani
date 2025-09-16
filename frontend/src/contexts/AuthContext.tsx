@@ -65,9 +65,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     } catch (error: any) {
       console.error('Login failed:', error);
+      console.error('Login error:', error.response?.data || error.message);
+      
+      let errorMessage = "Invalid credentials";
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.non_field_errors) {
+          errorMessage = error.response.data.non_field_errors[0];
+        }
+      }
+      
       toast({
         title: "Login failed",
-        description: error.error || "Invalid credentials",
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;

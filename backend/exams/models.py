@@ -12,6 +12,7 @@ class Exam(models.Model):
         ('assignment', 'Assignment'),
     ]
     
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=100)
     exam_type = models.CharField(max_length=20, choices=EXAM_TYPES)
     course = models.CharField(max_length=100)
@@ -23,8 +24,14 @@ class Exam(models.Model):
     created_by = models.ForeignKey('users.StaffProfile', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', 'course', 'semester']),
+            models.Index(fields=['school', 'date']),
+        ]
+    
     def __str__(self):
-        return f"{self.name} - {self.subject} ({self.course})"
+        return f"{self.name} - {self.subject} ({self.course}) [{self.school.school_name}]"
 
 
 class ExamResult(models.Model):
@@ -54,6 +61,10 @@ class ExamResult(models.Model):
     
     class Meta:
         unique_together = ['exam', 'student']
+        indexes = [
+            models.Index(fields=['exam', 'student']),
+            models.Index(fields=['grade', 'entered_at']),
+        ]
     
     def __str__(self):
-        return f"{self.student.user.full_name} - {self.exam.name} ({self.marks_obtained}/{self.exam.max_marks})"
+        return f"{self.student.user.full_name} - {self.exam.name} ({self.marks_obtained}/{self.exam.max_marks}) [{self.exam.school.school_name}]"

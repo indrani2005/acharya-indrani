@@ -5,6 +5,7 @@ from django.conf import settings
 
 class ClassSession(models.Model):
     """Model for class sessions"""
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
     course = models.CharField(max_length=100)
     subject = models.CharField(max_length=100)
     batch = models.CharField(max_length=50)
@@ -15,10 +16,14 @@ class ClassSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ['course', 'subject', 'batch', 'date', 'start_time']
+        unique_together = ['school', 'course', 'subject', 'batch', 'date', 'start_time']
+        indexes = [
+            models.Index(fields=['school', 'date']),
+            models.Index(fields=['school', 'course', 'subject']),
+        ]
     
     def __str__(self):
-        return f"{self.subject} - {self.course} ({self.date})"
+        return f"{self.subject} - {self.course} ({self.date}) [{self.school.school_name}]"
 
 
 class AttendanceRecord(models.Model):
@@ -40,6 +45,10 @@ class AttendanceRecord(models.Model):
     
     class Meta:
         unique_together = ['session', 'student']
+        indexes = [
+            models.Index(fields=['session', 'student']),
+            models.Index(fields=['status', 'marked_at']),
+        ]
     
     def __str__(self):
-        return f"{self.student.user.full_name} - {self.session.subject} ({self.status})"
+        return f"{self.student.user.full_name} - {self.session.subject} ({self.status}) [{self.session.school.school_name}]"

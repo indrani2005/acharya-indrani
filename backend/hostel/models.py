@@ -4,13 +4,21 @@ from django.db import models
 
 class HostelBlock(models.Model):
     """Model for hostel blocks"""
-    name = models.CharField(max_length=50, unique=True)
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
+    name = models.CharField(max_length=50)
     description = models.TextField(blank=True)
     warden = models.ForeignKey('users.StaffProfile', on_delete=models.SET_NULL, null=True)
     total_rooms = models.IntegerField()
     
+    class Meta:
+        unique_together = ['school', 'name']
+        indexes = [
+            models.Index(fields=['school', 'name']),
+        ]
+    
     def __str__(self):
-        return self.name
+        school_name = self.school.school_name if self.school else "No School"
+        return f"{self.name} [{school_name}]"
 
 
 class HostelRoom(models.Model):
@@ -31,9 +39,13 @@ class HostelRoom(models.Model):
     
     class Meta:
         unique_together = ['block', 'room_number']
+        indexes = [
+            models.Index(fields=['block', 'room_number']),
+            models.Index(fields=['block', 'is_available']),
+        ]
     
     def __str__(self):
-        return f"{self.block.name} - {self.room_number}"
+        return f"{self.block.name} - {self.room_number} [{self.block.school.school_name}]"
 
 
 class HostelAllocation(models.Model):
@@ -52,8 +64,15 @@ class HostelAllocation(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     allocated_by = models.ForeignKey('users.StaffProfile', on_delete=models.CASCADE)
     
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['room', 'status']),
+            models.Index(fields=['allocation_date', 'status']),
+        ]
+    
     def __str__(self):
-        return f"{self.student.user.full_name} - {self.room}"
+        return f"{self.student.user.full_name} - {self.room} [{self.room.block.school.school_name}]"
 
 
 class HostelComplaint(models.Model):
@@ -83,5 +102,12 @@ class HostelComplaint(models.Model):
     resolved_date = models.DateTimeField(null=True, blank=True)
     resolved_by = models.ForeignKey('users.StaffProfile', on_delete=models.SET_NULL, null=True, blank=True)
     
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['room', 'priority']),
+            models.Index(fields=['submitted_date', 'status']),
+        ]
+    
     def __str__(self):
-        return f"{self.title} - {self.student.user.full_name}"
+        return f"{self.title} - {self.student.user.full_name} [{self.room.block.school.school_name}]"

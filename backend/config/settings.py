@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
+    # 'django_filters',  # Temporarily commented out
     # User apps
     "users",
     "admissions",
@@ -56,6 +57,7 @@ INSTALLED_APPS = [
     "notifications",
     "reports",
     "analytics",
+    "schools",  # New schools app
 ]
 
 MIDDLEWARE = [
@@ -93,8 +95,12 @@ SIMPLE_JWT = {
 # CORS Settings
 CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
+    "http://localhost:5173",  # Default Vite dev server
     "http://127.0.0.1:5173",
+    "http://localhost:8080",  # Configured Vite dev server
+    "http://127.0.0.1:8080",
+    "http://localhost:8081",  # Alternative Vite dev server port
+    "http://127.0.0.1:8081",
 ]
 
 # API Documentation
