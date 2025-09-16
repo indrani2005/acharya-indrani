@@ -1,7 +1,77 @@
 from django.db import models
+from django.utils import timezone
+import uuid
+import random
+import string
+from datetime import timedelta
 
 from django.db import models
 from django.conf import settings
+
+def generate_reference_id():
+    """Generate a unique reference ID for admission applications"""
+    # Format: ADM-YYYY-XXXXXX (e.g., ADM-2025-A1B2C3)
+    year = str(timezone.now().year)
+    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return f"ADM-{year}-{random_part}"
+
+def generate_otp():
+    """Generate a 6-digit OTP"""
+    return ''.join(random.choices(string.digits, k=6))
+
+class EmailVerification(models.Model):
+    """Model for email OTP verification before admission submission"""
+    
+    email = models.EmailField(db_index=True)
+    otp = models.CharField(max_length=6, default=generate_otp)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveIntegerField(default=0)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['email', 'is_verified']),
+            models.Index(fields=['email', 'expires_at']),
+        ]
+        ordering = ['-created_at']
+    
+    def save(self, *args, **kwargs):
+        """Set expiration time if not set"""
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)  # OTP expires in 10 minutes
+        super().save(*args, **kwargs)
+    
+    def is_expired(self):
+        """Check if OTP has expired"""
+        return timezone.now() > self.expires_at
+    
+    def is_valid(self, otp_input):
+        """Check if provided OTP is valid"""
+        return (
+            self.otp == otp_input and 
+            not self.is_expired() and 
+            not self.is_verified and
+            self.attempts < 3  # Max 3 attempts
+        )
+    
+    def verify(self, otp_input):
+        """Verify the OTP and mark as verified if correct"""
+        self.attempts += 1
+        
+        if self.is_valid(otp_input):
+            self.is_verified = True
+            self.verified_at = timezone.now()
+            self.save()
+            return True
+        else:
+            self.save()  # Save the incremented attempts
+            return False
+    
+    def __str__(self):
+        status = "Verified" if self.is_verified else "Pending"
+        return f"OTP for {self.email} - {status} ({self.otp})"
 
 class AdmissionApplication(models.Model):
     """Model for admission applications"""
@@ -13,8 +83,16 @@ class AdmissionApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
     
-    # School Information
-    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, null=True, blank=True)
+    # Reference ID for tracking
+    reference_id = models.CharField(max_length=20, unique=True, blank=True, db_index=True)
+    
+    # Email verification (required before submission)
+    email_verification = models.ForeignKey(EmailVerification, on_delete=models.SET_NULL, null=True, blank=True, related_name='applications')
+    
+    # School Preferences (First, Second, Third choice)
+    first_preference_school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='first_preference_applications', null=True, blank=True)
+    second_preference_school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='second_preference_applications', null=True, blank=True)
+    third_preference_school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='third_preference_applications', null=True, blank=True)
     
     # Personal Information
     applicant_name = models.CharField(max_length=100)
@@ -46,11 +124,32 @@ class AdmissionApplication(models.Model):
     
     class Meta:
         indexes = [
-            models.Index(fields=['school', 'status']),
-            models.Index(fields=['school', 'application_date']),
+            models.Index(fields=['reference_id']),
+            models.Index(fields=['first_preference_school', 'status']),
+            models.Index(fields=['first_preference_school', 'application_date']),
             models.Index(fields=['course_applied', 'status']),
         ]
     
+    def save(self, *args, **kwargs):
+        """Override save to generate reference ID if not present"""
+        if not self.reference_id:
+            self.reference_id = generate_reference_id()
+            # Ensure uniqueness
+            while AdmissionApplication.objects.filter(reference_id=self.reference_id).exists():
+                self.reference_id = generate_reference_id()
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        school_name = self.school.school_name if self.school else "No School"
-        return f"{self.applicant_name} - {self.course_applied} ({self.status}) [{school_name}]"
+        first_school = self.first_preference_school.school_name if self.first_preference_school else "No School"
+        return f"{self.applicant_name} - {self.course_applied} ({self.status}) [{first_school}] - {self.reference_id}"
+    
+    def get_school_preferences(self):
+        """Get list of school preferences in order"""
+        preferences = []
+        if self.first_preference_school:
+            preferences.append(('1st', self.first_preference_school))
+        if self.second_preference_school:
+            preferences.append(('2nd', self.second_preference_school))
+        if self.third_preference_school:
+            preferences.append(('3rd', self.third_preference_school))
+        return preferences

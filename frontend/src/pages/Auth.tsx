@@ -326,7 +326,7 @@ const Auth = () => {
                 onClick={() => navigate('/admission')} 
                 disabled={isLoading}
               >
-                {isLoading ? "Loading..." : "Apply Now"}
+                {isLoading ? "Loading..." : "Apply or Track"}
               </Button>
             </CardContent>
           </Card>

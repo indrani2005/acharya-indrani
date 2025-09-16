@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ArrowLeft, Upload, CheckCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CalendarIcon, ArrowLeft, Upload, CheckCircle, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { admissionService, schoolService } from "@/lib/api/services";
 import { extractApiData, extractErrorMessage } from "@/lib/utils/apiHelpers";
-import { School } from "@/lib/api/types";
+import { School, AdmissionTrackingResponse } from "@/lib/api/types";
 
 interface AdmissionFormData {
   applicant_name: string;
@@ -23,7 +24,9 @@ interface AdmissionFormData {
   phone_number: string;
   address: string;
   course_applied: string;
-  school: number | "";
+  first_preference_school: number | "";
+  second_preference_school: number | "";
+  third_preference_school: number | "";
   previous_school: string;
   last_percentage: number | "";
   documents: File[];
@@ -40,6 +43,20 @@ const Admission = () => {
   const [date, setDate] = useState<Date>();
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
+  const [trackingId, setTrackingId] = useState("");
+  const [trackingResult, setTrackingResult] = useState<AdmissionTrackingResponse | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  
+  // Email verification states
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  
   const [formData, setFormData] = useState<AdmissionFormData>({
     applicant_name: "",
     date_of_birth: "",
@@ -47,7 +64,9 @@ const Admission = () => {
     phone_number: "",
     address: "",
     course_applied: "",
-    school: "",
+    first_preference_school: "",
+    second_preference_school: "",
+    third_preference_school: "",
     previous_school: "",
     last_percentage: "",
     documents: [],
@@ -57,6 +76,7 @@ const Admission = () => {
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   // Fetch schools on component mount
   useEffect(() => {
@@ -79,6 +99,85 @@ const Admission = () => {
     fetchSchools();
   }, [toast]);
 
+  const handleTrackApplication = async () => {
+    if (!trackingId.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a reference ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTracking(true);
+    try {
+      const result = await admissionService.trackApplication(trackingId.trim());
+      setTrackingResult(result);
+      
+      if (!result.success) {
+        toast({
+          title: "Not Found",
+          description: result.message || "No application found with this reference ID",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to track application. Please try again.",
+        variant: "destructive",
+      });
+      setTrackingResult(null);
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
+  // Handle tracking URL parameter
+  useEffect(() => {
+    const refParam = searchParams.get('ref');
+    if (refParam) {
+      setTrackingId(refParam);
+      setShowTrackingModal(true);
+      // Auto-track the application when component mounts with ref parameter
+      const autoTrack = async () => {
+        setIsTracking(true);
+        try {
+          const result = await admissionService.trackApplication(refParam.trim());
+          setTrackingResult(result);
+          
+          if (!result.success) {
+            toast({
+              title: "Not Found",
+              description: result.message || "No application found with this reference ID",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to track application. Please try again.",
+            variant: "destructive",
+          });
+          setTrackingResult(null);
+        } finally {
+          setIsTracking(false);
+        }
+      };
+      autoTrack();
+    }
+  }, [searchParams, toast]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'under_review': return 'text-blue-600 bg-blue-50';
+      case 'approved': return 'text-green-600 bg-green-50';
+      case 'rejected': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+
   const handleInputChange = (field: keyof AdmissionFormData, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -95,16 +194,128 @@ const Admission = () => {
     }));
   };
 
+  // Email verification functions
+  const handleSendOtp = async () => {
+    if (!formData.email || !formData.applicant_name) {
+      toast({
+        title: "Error",
+        description: "Please enter your name and email address first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (otpCooldown > 0) {
+      toast({
+        title: "Please wait",
+        description: `You can request a new OTP in ${otpCooldown} seconds`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const result = await admissionService.requestEmailVerification({
+        email: formData.email,
+        applicant_name: formData.applicant_name
+      });
+
+      if (result.success) {
+        setOtpSent(true);
+        setOtpCooldown(120); // 2 minutes cooldown
+        toast({
+          title: "OTP Sent",
+          description: "Please check your email for the verification code",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to send OTP",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid 6-digit OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifyingEmail(true);
+    try {
+      const result = await admissionService.verifyEmail({
+        email: formData.email,
+        otp: otp
+      });
+
+      if (result.success && result.verification_token) {
+        setIsEmailVerified(true);
+        setVerificationToken(result.verification_token);
+        toast({
+          title: "Email Verified",
+          description: "Your email has been successfully verified!",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Invalid OTP",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to verify OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
+
+  // Cooldown timer effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (otpCooldown > 0) {
+      timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
+
+  // Reset email verification when email changes
+  useEffect(() => {
+    setIsEmailVerified(false);
+    setVerificationToken("");
+    setOtpSent(false);
+    setOtp("");
+  }, [formData.email]);
+
   const isStepValid = useMemo(() => {
     if (step === 1) {
       return (
         formData.applicant_name.trim().length > 1 &&
         formData.date_of_birth &&
         formData.course_applied &&
-        formData.school &&
+        formData.first_preference_school &&
         formData.phone_number &&
         formData.email &&
-        formData.address
+        formData.address &&
+        isEmailVerified  // Email must be verified
       );
     }
     if (step === 2) {
@@ -117,7 +328,7 @@ const Admission = () => {
       return formData.acceptedTerms;
     }
     return false;
-  }, [step, formData]);
+  }, [step, formData, isEmailVerified]);
 
   const uploadDocuments = async (applicationId: number, documents: File[]): Promise<void> => {
     // This would upload documents to your file storage
@@ -157,8 +368,12 @@ const Admission = () => {
         phone_number: formData.phone_number,
         address: formData.address,
         course_applied: formData.course_applied,
+        first_preference_school: formData.first_preference_school === "" ? null : Number(formData.first_preference_school),
+        second_preference_school: formData.second_preference_school === "" ? null : Number(formData.second_preference_school),
+        third_preference_school: formData.third_preference_school === "" ? null : Number(formData.third_preference_school),
         previous_school: formData.previous_school || "",
-        last_percentage: formData.last_percentage || null,
+        last_percentage: formData.last_percentage === "" ? null : Number(formData.last_percentage),
+        email_verification_token: verificationToken,  // Include verification token
       };
 
       // Submit the application
@@ -208,7 +423,7 @@ const Admission = () => {
               {submittedApplication && (
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm font-medium">Application Reference ID:</p>
-                  <p className="text-lg font-bold text-blue-600">#{(submittedApplication as any).id}</p>
+                  <p className="text-lg font-bold text-blue-600">{(submittedApplication as any).reference_id || `#${(submittedApplication as any).id}`}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     Please save this reference ID for future correspondence.
                   </p>
@@ -238,7 +453,9 @@ const Admission = () => {
                       phone_number: "",
                       address: "",
                       course_applied: "",
-                      school: "",
+                      first_preference_school: "",
+                      second_preference_school: "",
+                      third_preference_school: "",
                       previous_school: "",
                       last_percentage: "",
                       documents: [],
@@ -262,18 +479,106 @@ const Admission = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl">
+      <div className="w-full max-w-6xl">
         <Card className="shadow-2xl border-0 overflow-hidden">
-          <CardHeader className="text-center bg-gradient-primary text-white">
-            <div className="flex justify-center mb-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-                <Upload className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-3xl">Admission Application</CardTitle>
-            <CardDescription className="text-white/90">
+          <CardHeader className="text-center bg-gradient-primary text-white py-4 relative">
+            <CardTitle className="text-xl mb-1">Admission Application</CardTitle>
+            <CardDescription className="text-white/90 text-sm">
               Fill out the form below to apply for admission
             </CardDescription>
+            
+            {/* Track Application Button */}
+            <Dialog open={showTrackingModal} onOpenChange={setShowTrackingModal}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="absolute top-4 right-4 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Track Application
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Track Your Application</DialogTitle>
+                  <DialogDescription>
+                    Enter your reference ID to check your application status
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tracking-id">Reference ID</Label>
+                    <Input
+                      id="tracking-id"
+                      placeholder="Enter your reference ID (e.g., ADM-2025-A1B2C3)"
+                      value={trackingId}
+                      onChange={(e) => setTrackingId(e.target.value)}
+                    />
+                  </div>
+                  
+                  <Button 
+                    onClick={handleTrackApplication} 
+                    disabled={isTracking}
+                    className="w-full"
+                  >
+                    {isTracking ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Tracking...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Track Application
+                      </>
+                    )}
+                  </Button>
+
+                  {trackingResult && trackingResult.success && trackingResult.data && (
+                    <div className="mt-4 p-4 border rounded-lg bg-muted/20">
+                      <h4 className="font-semibold mb-2">Application Status</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Reference ID:</span>
+                          <span className="font-mono">{trackingResult.data.reference_id}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Applicant:</span>
+                          <span>{trackingResult.data.applicant_name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Course:</span>
+                          <span>{trackingResult.data.course_applied}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Status:</span>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(trackingResult.data.status)}`}>
+                            {trackingResult.data.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Applied:</span>
+                          <span>{new Date(trackingResult.data.application_date).toLocaleDateString()}</span>
+                        </div>
+                        {trackingResult.data.first_preference_school && (
+                          <div className="flex justify-between">
+                            <span>1st Preference:</span>
+                            <span>{trackingResult.data.first_preference_school.school_name}</span>
+                          </div>
+                        )}
+                        {trackingResult.data.review_comments && (
+                          <div className="mt-2">
+                            <span className="font-medium">Comments:</span>
+                            <p className="text-muted-foreground mt-1">{trackingResult.data.review_comments}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent className="p-6">
             {/* Step Progress */}
@@ -293,9 +598,9 @@ const Admission = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {step === 1 && (
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
-                  <h3 className="text-lg font-semibold text-gray-800">Step 1: Personal & Contact Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4 max-h-[75vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Step 1: Personal & Contact Details</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="applicant_name" className="text-gray-700">Full Name *</Label>
                       <Input 
@@ -309,84 +614,174 @@ const Admission = () => {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-gray-700">Date of Birth *</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            className={cn(
-                              "w-full justify-start text-left font-normal border-gray-300", 
-                              !date && "text-muted-foreground"
-                            )}
-                          > 
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {date ? format(date, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar 
-                            mode="single" 
-                            selected={date} 
-                            onSelect={(selectedDate) => { 
-                              setDate(selectedDate); 
-                              handleInputChange('date_of_birth', selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''); 
-                            }} 
-                            initialFocus 
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          placeholder="YYYY-MM-DD (e.g. 2000-12-31)"
+                          value={formData.date_of_birth}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            handleInputChange('date_of_birth', value);
+                            
+                            // Try to parse the date if it's a valid format
+                            if (value && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                              const parsedDate = new Date(value + 'T00:00:00'); // Add time to avoid timezone issues
+                              if (!isNaN(parsedDate.getTime())) {
+                                setDate(parsedDate);
+                              }
+                            } else if (!value) {
+                              setDate(undefined);
+                            }
+                          }}
+                          className="border-gray-300 pr-10"
+                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 h-8 w-8 hover:bg-gray-100"
+                              type="button"
+                            > 
+                              <CalendarIcon className="h-4 w-4 text-gray-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar 
+                              mode="single" 
+                              selected={date} 
+                              onSelect={(selectedDate) => { 
+                                setDate(selectedDate); 
+                                handleInputChange('date_of_birth', selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''); 
+                              }} 
+                              initialFocus 
+                              captionLayout="dropdown-buttons"
+                              fromYear={1950}
+                              toYear={new Date().getFullYear()}
+                              className="rounded-md border"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="course_applied" className="text-gray-700">Class/Course Applying For *</Label>
+                      <Select onValueChange={(value) => handleInputChange('course_applied', value)} required>
+                        <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                          <SelectValue placeholder="Select class or course" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nursery">Nursery</SelectItem>
+                          <SelectItem value="lkg">LKG</SelectItem>
+                          <SelectItem value="ukg">UKG</SelectItem>
+                          {Array.from({length: 12}, (_, i) => i + 1).map((grade) => (
+                            <SelectItem key={grade} value={`class-${grade}`}>Class {grade}</SelectItem>
+                          ))}
+                          <SelectItem value="11th-science">11th Science</SelectItem>
+                          <SelectItem value="11th-commerce">11th Commerce</SelectItem>
+                          <SelectItem value="11th-arts">11th Arts</SelectItem>
+                          <SelectItem value="12th-science">12th Science</SelectItem>
+                          <SelectItem value="12th-commerce">12th Commerce</SelectItem>
+                          <SelectItem value="12th-arts">12th Arts</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="course_applied" className="text-gray-700">Class/Course Applying For *</Label>
-                    <Select onValueChange={(value) => handleInputChange('course_applied', value)} required>
-                      <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
-                        <SelectValue placeholder="Select class or course" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nursery">Nursery</SelectItem>
-                        <SelectItem value="lkg">LKG</SelectItem>
-                        <SelectItem value="ukg">UKG</SelectItem>
-                        {Array.from({length: 12}, (_, i) => i + 1).map((grade) => (
-                          <SelectItem key={grade} value={`class-${grade}`}>Class {grade}</SelectItem>
-                        ))}
-                        <SelectItem value="11th-science">11th Science</SelectItem>
-                        <SelectItem value="11th-commerce">11th Commerce</SelectItem>
-                        <SelectItem value="11th-arts">11th Arts</SelectItem>
-                        <SelectItem value="12th-science">12th Science</SelectItem>
-                        <SelectItem value="12th-commerce">12th Commerce</SelectItem>
-                        <SelectItem value="12th-arts">12th Arts</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">School Preferences</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="first_preference" className="text-gray-700">1st Preference *</Label>
+                        <Select onValueChange={(value) => handleInputChange('first_preference_school', parseInt(value))} required>
+                          <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                            <SelectValue placeholder={isLoadingSchools ? "Loading..." : "Select 1st choice"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingSchools ? (
+                              <SelectItem value="loading" disabled>
+                                <div className="flex items-center">
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Loading schools...
+                                </div>
+                              </SelectItem>
+                            ) : schools.length > 0 ? (
+                              schools.map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  {school.school_name} - {school.district}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-schools" disabled>
+                                No schools available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="second_preference" className="text-gray-700">2nd Preference</Label>
+                        <Select onValueChange={(value) => handleInputChange('second_preference_school', parseInt(value))}>
+                          <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                            <SelectValue placeholder={isLoadingSchools ? "Loading..." : "Select 2nd choice"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingSchools ? (
+                              <SelectItem value="loading" disabled>
+                                <div className="flex items-center">
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Loading schools...
+                                </div>
+                              </SelectItem>
+                            ) : schools.length > 0 ? (
+                              schools.filter(s => s.id !== formData.first_preference_school).map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  {school.school_name} - {school.district}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-schools" disabled>
+                                No schools available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="third_preference" className="text-gray-700">3rd Preference</Label>
+                        <Select onValueChange={(value) => handleInputChange('third_preference_school', parseInt(value))}>
+                          <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                            <SelectValue placeholder={isLoadingSchools ? "Loading..." : "Select 3rd choice"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingSchools ? (
+                              <SelectItem value="loading" disabled>
+                                <div className="flex items-center">
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Loading schools...
+                                </div>
+                              </SelectItem>
+                            ) : schools.length > 0 ? (
+                              schools.filter(s => 
+                                s.id !== formData.first_preference_school && 
+                                s.id !== formData.second_preference_school
+                              ).map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  {school.school_name} - {school.district}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-schools" disabled>
+                                No schools available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="school" className="text-gray-700">Preferred School *</Label>
-                    <Select onValueChange={(value) => handleInputChange('school', parseInt(value))} required>
-                      <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
-                        <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select preferred school"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isLoadingSchools ? (
-                          <SelectItem value="loading" disabled>
-                            <div className="flex items-center">
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Loading schools...
-                            </div>
-                          </SelectItem>
-                        ) : schools.length > 0 ? (
-                          schools.map((school) => (
-                            <SelectItem key={school.id} value={school.id.toString()}>
-                              {school.school_name} - {school.district}, {school.block}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-schools" disabled>
-                            No schools available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="phone_number" className="text-gray-700">Contact Number *</Label>
                       <Input 
@@ -401,34 +796,109 @@ const Admission = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-gray-700">Email Address *</Label>
+                      <div className="space-y-3">
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          placeholder="Enter email address" 
+                          value={formData.email} 
+                          onChange={(e) => handleInputChange('email', e.target.value)} 
+                          required 
+                          className="border-gray-300 focus:border-primary focus:ring-primary"
+                          disabled={isEmailVerified}
+                        />
+                        
+                        {/* Email verification section */}
+                        {formData.email && formData.applicant_name && !isEmailVerified && (
+                          <div className="space-y-2">
+                            {!otpSent ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleSendOtp}
+                                disabled={isSendingOtp || otpCooldown > 0}
+                                className="w-full"
+                              >
+                                {isSendingOtp ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Sending OTP...
+                                  </>
+                                ) : otpCooldown > 0 ? (
+                                  `Resend OTP in ${otpCooldown}s`
+                                ) : (
+                                  "Send Verification OTP"
+                                )}
+                              </Button>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex space-x-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="Enter 6-digit OTP"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    maxLength={6}
+                                    className="flex-1"
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={handleVerifyOtp}
+                                    disabled={isVerifyingEmail || otp.length !== 6}
+                                  >
+                                    {isVerifyingEmail ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      "Verify"
+                                    )}
+                                  </Button>
+                                </div>
+                                <div className="flex justify-between">
+                                  <p className="text-sm text-gray-600">
+                                    Check your email for the verification code
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleSendOtp}
+                                    disabled={isSendingOtp || otpCooldown > 0}
+                                    className="text-primary"
+                                  >
+                                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend OTP"}
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Email verified indicator */}
+                        {isEmailVerified && (
+                          <div className="flex items-center space-x-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Email verified successfully</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address" className="text-gray-700">Complete Address *</Label>
                       <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="Enter email address" 
-                        value={formData.email} 
-                        onChange={(e) => handleInputChange('email', e.target.value)} 
+                        id="address" 
+                        placeholder="Enter complete address with pin code" 
+                        value={formData.address} 
+                        onChange={(e) => handleInputChange('address', e.target.value)} 
                         required 
                         className="border-gray-300 focus:border-primary focus:ring-primary"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-gray-700">Complete Address *</Label>
-                    <Textarea 
-                      id="address" 
-                      placeholder="Enter complete address with pin code" 
-                      value={formData.address} 
-                      onChange={(e) => handleInputChange('address', e.target.value)} 
-                      required 
-                      rows={3} 
-                      className="border-gray-300 focus:border-primary focus:ring-primary"
-                    />
-                  </div>
                 </div>
               )}
 
               {step === 2 && (
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+                <div className="space-y-4 max-h-[75vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold text-gray-800">Step 2: Upload Required Documents</h3>
                   <div className="p-4 bg-muted/30 rounded-lg border">
                     <h4 className="font-medium mb-2">Required Documents:</h4>
@@ -484,9 +954,9 @@ const Admission = () => {
               )}
 
               {step === 3 && (
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
-                  <h3 className="text-lg font-semibold text-gray-800">Step 3: Additional Information (Optional)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4 max-h-[75vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Step 3: Additional Information (Optional)</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="previous_school" className="text-gray-700">Previous School</Label>
                       <Input 
@@ -532,8 +1002,8 @@ const Admission = () => {
               )}
 
               {step === 4 && (
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
-                  <h3 className="text-lg font-semibold text-gray-800">Step 4: Review & Submit</h3>
+                <div className="space-y-4 max-h-[75vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Step 4: Review & Submit</h3>
                   
                   {/* Application Summary */}
                   <div className="p-4 bg-muted/20 rounded-lg border space-y-3">
@@ -552,10 +1022,19 @@ const Admission = () => {
                         <span className="text-muted-foreground ml-1">{formData.course_applied}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Preferred School:</span> 
-                        <span className="text-muted-foreground ml-1">
-                          {schools.find(s => s.id === formData.school)?.school_name || 'Not selected'}
-                        </span>
+                        <span className="font-medium">School Preferences:</span> 
+                        <div className="text-muted-foreground ml-1">
+                          {formData.first_preference_school && (
+                            <div>1st: {schools.find(s => s.id === formData.first_preference_school)?.school_name}</div>
+                          )}
+                          {formData.second_preference_school && (
+                            <div>2nd: {schools.find(s => s.id === formData.second_preference_school)?.school_name}</div>
+                          )}
+                          {formData.third_preference_school && (
+                            <div>3rd: {schools.find(s => s.id === formData.third_preference_school)?.school_name}</div>
+                          )}
+                          {!formData.first_preference_school && <span>Not selected</span>}
+                        </div>
                       </div>
                       <div>
                         <span className="font-medium">Documents:</span> 

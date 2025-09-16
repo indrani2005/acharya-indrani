@@ -69,20 +69,62 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface EmailVerificationRequest {
+  email: string;
+  applicant_name?: string;
+}
+
+export interface EmailVerificationResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface EmailVerification {
+  email: string;
+  otp: string;
+}
+
+export interface EmailVerificationResult {
+  success: boolean;
+  message: string;
+  verification_token?: string;
+}
+
 export interface AdmissionApplication {
   id?: number;
+  reference_id?: string;
   applicant_name: string;
   date_of_birth: string;
   email: string;
   phone_number: string;
   address: string;
   course_applied: string;
+  first_preference_school?: number;
+  second_preference_school?: number;
+  third_preference_school?: number;
   previous_school?: string;
   last_percentage?: number;
   documents?: Record<string, string>;
   status: 'pending' | 'under_review' | 'approved' | 'rejected';
-  applied_date?: string;
+  application_date?: string;
   review_comments?: string;
+  email_verification_token?: string;  // Required for submission
+}
+
+export interface AdmissionTrackingResponse {
+  success: boolean;
+  data?: {
+    reference_id: string;
+    applicant_name: string;
+    course_applied: string;
+    status: string;
+    first_preference_school?: School;
+    second_preference_school?: School;
+    third_preference_school?: School;
+    application_date: string;
+    review_comments?: string;
+  };
+  message?: string;
 }
 
 export interface FeeInvoice {

@@ -1,5 +1,10 @@
 import { 
   AdmissionApplication,
+  AdmissionTrackingResponse,
+  EmailVerificationRequest,
+  EmailVerificationResponse,
+  EmailVerification,
+  EmailVerificationResult,
   School,
   SchoolsResponse,
   FeeInvoice,
@@ -26,7 +31,15 @@ export const schoolService = {
 };
 
 export const admissionService = {
-  // Submit admission application
+  // Email verification for admission
+  requestEmailVerification: (data: EmailVerificationRequest): Promise<EmailVerificationResponse> =>
+    api.post('admissions/verify-email/request/', data),
+
+  // Verify email with OTP
+  verifyEmail: (data: EmailVerification): Promise<EmailVerificationResult> =>
+    api.post('admissions/verify-email/verify/', data),
+
+  // Submit admission application (requires email verification)
   submitApplication: (data: Partial<AdmissionApplication>): Promise<AdmissionApplication> =>
     api.post('admissions/applications/', data),
 
@@ -41,6 +54,10 @@ export const admissionService = {
   // Review application (admin)
   reviewApplication: (id: number, data: { status: string; review_comments?: string }): Promise<AdmissionApplication> =>
     api.patch(`admissions/applications/${id}/review/`, data),
+
+  // Track application by reference ID
+  trackApplication: (reference_id: string): Promise<AdmissionTrackingResponse> =>
+    api.get(`admissions/track/?reference_id=${reference_id}`),
 };
 
 export const feeService = {
