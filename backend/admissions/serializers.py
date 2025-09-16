@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AdmissionApplication, EmailVerification
+from .models import AdmissionApplication, EmailVerification, SchoolAdmissionDecision
 from schools.serializers import SchoolSerializer
 
 
@@ -81,18 +81,30 @@ class AdmissionApplicationCreateSerializer(serializers.ModelSerializer):
         return application
 
 
+class SchoolAdmissionDecisionSerializer(serializers.ModelSerializer):
+    """Serializer for SchoolAdmissionDecision"""
+    school = SchoolSerializer(read_only=True)
+    application = serializers.StringRelatedField(read_only=True)
+    
+    class Meta:
+        model = SchoolAdmissionDecision
+        fields = '__all__'
+        read_only_fields = ['decision_date', 'student_choice_date']
+
+
 class AdmissionTrackingSerializer(serializers.ModelSerializer):
-    """Serializer for tracking admission applications"""
+    """Serializer for tracking admission applications with school decisions"""
     first_preference_school = SchoolSerializer(read_only=True)
     second_preference_school = SchoolSerializer(read_only=True)
     third_preference_school = SchoolSerializer(read_only=True)
+    school_decisions = SchoolAdmissionDecisionSerializer(many=True, read_only=True)
     
     class Meta:
         model = AdmissionApplication
         fields = [
             'reference_id', 'applicant_name', 'course_applied', 'status',
             'first_preference_school', 'second_preference_school', 'third_preference_school',
-            'application_date', 'review_comments'
+            'application_date', 'review_comments', 'school_decisions'
         ]
 
 
@@ -100,3 +112,29 @@ class AdmissionReviewSerializer(serializers.Serializer):
     """Serializer for reviewing admission applications"""
     status = serializers.ChoiceField(choices=AdmissionApplication.STATUS_CHOICES)
     review_comments = serializers.CharField(required=False, allow_blank=True)
+
+
+class SchoolDecisionUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating school admission decisions"""
+    
+    class Meta:
+        model = SchoolAdmissionDecision
+        fields = ['decision', 'review_comments']
+
+
+class StudentChoiceSerializer(serializers.Serializer):
+    """Serializer for student choosing among accepted schools"""
+    school_decision_id = serializers.IntegerField()
+
+
+class AdmissionApplicationWithDecisionsSerializer(serializers.ModelSerializer):
+    """Enhanced serializer with school decisions"""
+    first_preference_school = SchoolSerializer(read_only=True)
+    second_preference_school = SchoolSerializer(read_only=True)
+    third_preference_school = SchoolSerializer(read_only=True)
+    school_decisions = SchoolAdmissionDecisionSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = AdmissionApplication
+        fields = '__all__'
+        read_only_fields = ['reference_id', 'application_date', 'reviewed_by', 'review_date']

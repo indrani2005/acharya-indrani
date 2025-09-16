@@ -37,7 +37,7 @@ import {
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
-import { adminAPI, SchoolStats, Student, Teacher, Staff, UserData } from "@/services/adminAPI";
+import { adminAPI, SchoolStats, Student, Teacher, Staff, UserData, AdmissionApplication } from "@/services/adminAPI";
 
 export default function AdminDashboard() {
   const { user, profile } = useAuth();
@@ -70,6 +70,7 @@ export default function AdminDashboard() {
   const [teachersData, setTeachersData] = useState<Teacher[]>([]);
   const [staffData, setStaffData] = useState<Staff[]>([]);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [admissionsData, setAdmissionsData] = useState<AdmissionApplication[]>([]);
   const [feesData, setFeesData] = useState<any[]>([]);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [examsData, setExamsData] = useState<any[]>([]);
@@ -90,6 +91,7 @@ export default function AdminDashboard() {
           teachers,
           staff,
           users,
+          admissions,
           fees,
           attendance,
           exams
@@ -99,6 +101,7 @@ export default function AdminDashboard() {
           adminAPI.getTeachers(),
           adminAPI.getStaff(),
           adminAPI.getAllUsers(),
+          adminAPI.getSchoolAdmissions(),
           adminAPI.getFeesData(),
           adminAPI.getAttendanceData(),
           adminAPI.getExamsData()
@@ -109,6 +112,7 @@ export default function AdminDashboard() {
         setTeachersData(teachers);
         setStaffData(staff);
         setAllUsers(users);
+        setAdmissionsData(admissions);
         setFeesData(fees);
         setAttendanceData(attendance);
         setExamsData(exams);
@@ -130,6 +134,7 @@ export default function AdminDashboard() {
     { id: "teachers", label: "Teachers", icon: Users },
     { id: "staff", label: "Staff", icon: UserCheck },
     { id: "wardens", label: "Wardens", icon: Home },
+    { id: "admissions", label: "Review Admissions", icon: UserPlus },
     { id: "fees", label: "Fees & Payments", icon: CreditCard },
     { id: "attendance", label: "Attendance", icon: Calendar },
     { id: "exams", label: "Examinations", icon: BookOpen },
@@ -601,6 +606,171 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderAdmissionsTab = () => {
+    const filteredAdmissions = filterData(admissionsData, "admissions");
+
+    const handleDecisionUpdate = async (decisionId: number, status: string, notes?: string) => {
+      try {
+        await adminAPI.updateAdmissionDecision(decisionId, status, notes);
+        // Reload admissions data
+        const updatedAdmissions = await adminAPI.getSchoolAdmissions();
+        setAdmissionsData(updatedAdmissions);
+      } catch (error) {
+        console.error('Error updating admission decision:', error);
+        // You might want to show a toast notification here
+      }
+    };
+
+    const getStatusBadge = (status: string) => {
+      switch (status) {
+        case 'pending':
+          return <Badge variant="secondary">Pending</Badge>;
+        case 'accepted':
+          return <Badge variant="default" className="bg-green-500">Accepted</Badge>;
+        case 'rejected':
+          return <Badge variant="destructive">Rejected</Badge>;
+        default:
+          return <Badge variant="outline">{status}</Badge>;
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Review Admissions</h2>
+          <div className="flex gap-4">
+            <Input
+              placeholder="Search applications..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-64"
+            />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Admission Applications for Your School</CardTitle>
+            <CardDescription>
+              Review and manage admission applications submitted for your school
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading applications...</span>
+              </div>
+            ) : filteredAdmissions.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="flex flex-col items-center gap-4">
+                  <UserPlus className="h-12 w-12 text-muted-foreground" />
+                  <div>
+                    <h3 className="text-lg font-semibold">No Applications Found</h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm || filterStatus !== "all" 
+                        ? "No applications match your current filters." 
+                        : "No admission applications have been submitted for your school yet."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference ID</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>DOB</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAdmissions.map((application) => {
+                    // Find the school decision for this school
+                    const schoolDecision = application.school_decisions?.find(
+                      decision => decision.school === profile?.school
+                    );
+                    
+                    return (
+                      <TableRow key={application.id}>
+                        <TableCell className="font-medium">{application.reference_id}</TableCell>
+                        <TableCell>{application.full_name}</TableCell>
+                        <TableCell>{application.email}</TableCell>
+                        <TableCell>{application.phone}</TableCell>
+                        <TableCell>{new Date(application.date_of_birth).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {schoolDecision ? getStatusBadge(schoolDecision.status) : <Badge variant="secondary">Pending</Badge>}
+                        </TableCell>
+                        <TableCell>{new Date(application.submitted_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {(!schoolDecision || schoolDecision.status === 'pending') && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-green-500 hover:bg-green-600"
+                                  onClick={() => handleDecisionUpdate(
+                                    schoolDecision?.id || 0,
+                                    'accepted'
+                                  )}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleDecisionUpdate(
+                                    schoolDecision?.id || 0,
+                                    'rejected'
+                                  )}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            {schoolDecision && schoolDecision.status !== 'pending' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDecisionUpdate(
+                                  schoolDecision.id,
+                                  'pending'
+                                )}
+                              >
+                                Reset
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   // Other tabs with empty data states
   const renderEmptyTab = (title: string, description: string) => (
     <div className="space-y-6">
@@ -629,6 +799,8 @@ export default function AdminDashboard() {
         return renderTeachersTab();
       case "users":
         return renderUsersTab();
+      case "admissions":
+        return renderAdmissionsTab();
       case "staff":
         return renderEmptyTab("Staff Management", "Staff data will be displayed here when available.");
       case "wardens":

@@ -41,11 +41,19 @@ A comprehensive multi-school management system built with Django REST Framework 
 - Interactive charts
 - Export capabilities
 
-## 🚀 Quick Start
+## � Documentation
+
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design, components, and data flow
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete API reference and endpoints
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
+- **[Testing Guide](docs/TESTING.md)** - Testing strategies and implementation
+
+## �🚀 Quick Start
 
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
+- UV package manager
 - PostgreSQL (or SQLite for development)
 
 ### Backend Setup
@@ -56,27 +64,37 @@ git clone <repository-url>
 cd Acharya/backend
 ```
 
-2. **Create virtual environment**
+2. **Install UV package manager**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 3. **Install dependencies**
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
-4. **Database setup**
+4. **Environment setup**
 ```bash
-python manage.py makemigrations
-python manage.py migrate
-python manage.py createsuperuser
+# Copy environment file (create one if needed)
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-5. **Run development server**
+5. **Database setup**
 ```bash
-python manage.py runserver
+uv run python manage.py migrate
+uv run python manage.py create_test_admin
+uv run python manage.py create_test_applications --count 5
+```
+
+6. **Run development server**
+```bash
+uv run python manage.py runserver
 ```
 
 The API will be available at `http://localhost:8000/api/v1/`
@@ -209,13 +227,17 @@ VITE_APP_NAME=Acharya School Management
 
 ## 🧪 Testing
 
-### Backend Tests
+For comprehensive testing information, see the [Testing Guide](docs/TESTING.md).
+
+### Quick Test Commands
+
+#### Backend Tests
 ```bash
 cd backend
-python manage.py test
+uv run pytest
 ```
 
-### Frontend Tests
+#### Frontend Tests
 ```bash
 cd frontend
 npm run test
@@ -244,8 +266,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For support and questions:
 - Create an issue on GitHub
-- Check the [API Documentation](API_COMPREHENSIVE_DOCUMENTATION.md)
-- Review the troubleshooting guide
+- Check the [API Documentation](docs/API_DOCUMENTATION.md)
+- Review the [Architecture Guide](docs/ARCHITECTURE.md)
+- See the [Deployment Guide](docs/DEPLOYMENT.md)
 
 ## 🗺️ Roadmap
 

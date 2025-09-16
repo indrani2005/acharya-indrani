@@ -8,9 +8,12 @@ class User(AbstractUser):
     
     ROLE_CHOICES = [
         ('student', 'Student'),
+        ('parent', 'Parent'),
         ('faculty', 'Faculty'),
+        ('staff', 'Staff'),
         ('warden', 'Warden'),
         ('admin', 'Admin'),
+        ('management', 'Management'),
     ]
     
     email = models.EmailField(unique=True)

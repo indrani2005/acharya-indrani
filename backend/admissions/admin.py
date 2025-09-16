@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from django.contrib import admin
-from .models import AdmissionApplication, EmailVerification
+from .models import AdmissionApplication, EmailVerification, SchoolAdmissionDecision
 
 @admin.register(EmailVerification)
 class EmailVerificationAdmin(admin.ModelAdmin):
@@ -64,5 +64,33 @@ class AdmissionApplicationAdmin(admin.ModelAdmin):
         }),
         ('Documents', {
             'fields': ('documents',)
+        }),
+    )
+
+
+@admin.register(SchoolAdmissionDecision)
+class SchoolAdmissionDecisionAdmin(admin.ModelAdmin):
+    """Admin configuration for SchoolAdmissionDecision"""
+    
+    list_display = [
+        'application', 'school', 'preference_order', 'decision', 
+        'decision_date', 'reviewed_by', 'is_student_choice'
+    ]
+    list_filter = ['decision', 'preference_order', 'school', 'decision_date', 'is_student_choice']
+    search_fields = [
+        'application__applicant_name', 'application__reference_id', 
+        'school__school_name', 'application__email'
+    ]
+    readonly_fields = ['decision_date', 'student_choice_date']
+    
+    fieldsets = (
+        ('Application Info', {
+            'fields': ('application', 'school', 'preference_order')
+        }),
+        ('Decision', {
+            'fields': ('decision', 'decision_date', 'reviewed_by', 'review_comments')
+        }),
+        ('Student Choice', {
+            'fields': ('is_student_choice', 'student_choice_date')
         }),
     )

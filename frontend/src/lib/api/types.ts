@@ -109,6 +109,16 @@ export interface AdmissionApplication {
   application_date?: string;
   review_comments?: string;
   email_verification_token?: string;  // Required for submission
+  school_decisions?: SchoolAdmissionDecision[];
+}
+
+export interface SchoolAdmissionDecision {
+  id: number;
+  school: string;
+  school_name?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  review_date?: string;
+  notes?: string;
 }
 
 export interface AdmissionTrackingResponse {
@@ -123,6 +133,8 @@ export interface AdmissionTrackingResponse {
     third_preference_school?: School;
     application_date: string;
     review_comments?: string;
+    school_decisions?: SchoolAdmissionDecision[];
+    accepted_schools?: SchoolAdmissionDecision[];
   };
   message?: string;
 }

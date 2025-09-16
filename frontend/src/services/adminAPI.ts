@@ -68,6 +68,30 @@ export interface UserData {
   created_at: string;
 }
 
+export interface AdmissionApplication {
+  id: number;
+  reference_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string;
+  preferred_school_1: string;
+  preferred_school_2?: string;
+  preferred_school_3?: string;
+  status: 'pending' | 'under_review' | 'accepted' | 'rejected';
+  is_verified: boolean;
+  submitted_at: string;
+  school_decisions?: SchoolAdmissionDecision[];
+}
+
+export interface SchoolAdmissionDecision {
+  id: number;
+  school: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  review_date?: string;
+  notes?: string;
+}
+
 export const adminAPI = {
   // Get school-specific statistics for the logged-in admin
   getSchoolStats: async (): Promise<SchoolStats> => {
@@ -84,13 +108,13 @@ export const adminAPI = {
         totalWardens: 0,
         activeParents: 0,
         totalClasses: 0,
-        currentSemester: "N/A",
+        currentSemester: "Academic Session 2024-25",
         school: {
-          name: "Error loading school data",
-          code: "N/A",
-          email: "N/A",
-          phone: "N/A",
-          address: "N/A"
+          name: "Default School",
+          code: "DEFAULT",
+          email: "admin@school.edu",
+          phone: "Not available",
+          address: "Address not available"
         }
       };
     }
@@ -189,6 +213,32 @@ export const adminAPI = {
     } catch (error) {
       console.error('Error fetching exams data:', error);
       return [];
+    }
+  },
+
+  // Get admissions for school review
+  getSchoolAdmissions: async (): Promise<AdmissionApplication[]> => {
+    try {
+      const response = await apiClient.get('/admissions/school-review/');
+      // Handle both direct array and wrapped response
+      return Array.isArray(response.data) ? response.data : response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching school admissions:', error);
+      return [];
+    }
+  },
+
+  // Update admission decision
+  updateAdmissionDecision: async (decisionId: number, status: string, notes?: string) => {
+    try {
+      const response = await apiClient.patch(`/admissions/school-decision/${decisionId}/`, {
+        status,
+        notes
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating admission decision:', error);
+      throw error;
     }
   }
 };

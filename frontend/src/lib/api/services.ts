@@ -1,6 +1,7 @@
 import { 
   AdmissionApplication,
   AdmissionTrackingResponse,
+  SchoolAdmissionDecision,
   EmailVerificationRequest,
   EmailVerificationResponse,
   EmailVerification,
@@ -58,6 +59,14 @@ export const admissionService = {
   // Track application by reference ID
   trackApplication: (reference_id: string): Promise<AdmissionTrackingResponse> =>
     api.get(`admissions/track/?reference_id=${reference_id}`),
+
+  // Get accepted schools for student choice
+  getAcceptedSchools: (reference_id: string): Promise<ApiResponse<SchoolAdmissionDecision[]>> =>
+    api.get(`admissions/accepted-schools/?reference_id=${reference_id}`),
+
+  // Submit student's school choice
+  submitStudentChoice: (data: { reference_id: string; chosen_school: string }): Promise<ApiResponse<any>> =>
+    api.post('admissions/student-choice/', data),
 };
 
 export const feeService = {

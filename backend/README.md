@@ -116,10 +116,168 @@ A comprehensive school management system built with Django and Django REST Frame
       "school_code": "APS001"
     },
     "application_date": "2025-01-17T10:30:00Z",
-    "review_comments": ""
+    "review_comments": "",
+    "school_decisions": [
+      {
+        "id": 1,
+        "school": "Acharya Primary School",
+        "status": "accepted",
+        "review_date": "2025-01-18T14:30:00Z",
+        "notes": "Excellent academic record"
+      },
+      {
+        "id": 2,
+        "school": "Acharya Secondary School",
+        "status": "pending",
+        "review_date": null,
+        "notes": null
+      }
+    ]
   }
 }
 ```
+
+## Multi-School Review and Choice Workflow
+
+### School-Specific Review System
+
+The admission system supports independent review by each school in the student's preference list. Each school can accept or reject applications independently.
+
+#### For School Managers/Admins
+
+##### 1. Get Applications for Review
+**Endpoint**: `GET /api/v1/admissions/school-review/`
+- Returns applications where the current user's school is in the preference list
+- Each application includes current decision status for the school
+
+**Response**:
+```json
+[
+  {
+    "id": 1,
+    "reference_id": "ADM-2025-A1B2C3",
+    "full_name": "John Doe",
+    "email": "student@example.com",
+    "phone": "1234567890",
+    "date_of_birth": "2005-06-15",
+    "preferred_school_1": "Acharya Primary School",
+    "preferred_school_2": "Acharya Secondary School",
+    "status": "pending",
+    "submitted_at": "2025-01-17T10:30:00Z",
+    "school_decisions": [
+      {
+        "id": 1,
+        "school": "Acharya Primary School",
+        "status": "pending"
+      }
+    ]
+  }
+]
+```
+
+##### 2. Update School Decision
+**Endpoint**: `PATCH /api/v1/admissions/school-decision/{decision_id}/`
+
+```json
+{
+  "status": "accepted",  // "accepted", "rejected", or "pending"
+  "notes": "Excellent academic record and good interview performance"
+}
+```
+
+**Response**:
+```json
+{
+  "id": 1,
+  "school": "Acharya Primary School",
+  "status": "accepted",
+  "review_date": "2025-01-18T14:30:00Z",
+  "notes": "Excellent academic record and good interview performance"
+}
+```
+
+### Student Choice System
+
+When a student is accepted by multiple schools, they must choose which school to attend.
+
+#### 1. Get Accepted Schools
+**Endpoint**: `GET /api/v1/admissions/accepted-schools/?reference_id=ADM-2025-A1B2C3`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "school": "Acharya Primary School",
+      "school_name": "Acharya Primary School",
+      "status": "accepted",
+      "review_date": "2025-01-18T14:30:00Z",
+      "notes": "Excellent academic record"
+    },
+    {
+      "id": 3,
+      "school": "Acharya Higher Secondary",
+      "school_name": "Acharya Higher Secondary",
+      "status": "accepted",
+      "review_date": "2025-01-19T10:15:00Z",
+      "notes": "Good performance in entrance test"
+    }
+  ]
+}
+```
+
+#### 2. Submit Student Choice
+**Endpoint**: `POST /api/v1/admissions/student-choice/`
+
+```json
+{
+  "reference_id": "ADM-2025-A1B2C3",
+  "chosen_school": "Acharya Primary School"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "School choice submitted successfully",
+  "data": {
+    "reference_id": "ADM-2025-A1B2C3",
+    "chosen_school": "Acharya Primary School",
+    "choice_date": "2025-01-20T09:30:00Z"
+  }
+}
+```
+
+### Workflow States
+
+#### Application Status Flow
+1. **pending** - Initial state after submission
+2. **under_review** - At least one school is reviewing
+3. **accepted** - Student has been accepted and made final choice
+4. **rejected** - No schools accepted the application
+
+#### School Decision Status
+1. **pending** - School hasn't reviewed yet
+2. **accepted** - School approved the application
+3. **rejected** - School declined the application
+
+### Frontend Integration
+
+#### Manager Dashboard
+- **Review Admissions Tab**: New tab in admin dashboard
+- **School-Specific View**: Only shows applications relevant to manager's school
+- **Quick Actions**: Accept/Reject buttons with notes
+- **Status Tracking**: Visual indicators for decision status
+
+#### Student Tracking Interface
+- **Enhanced Tracking**: Shows decision from each school
+- **Choice Interface**: Appears when multiple acceptances exist
+- **Visual Feedback**: Clear status indicators and progress tracking
+- **Responsive Design**: Works on mobile and desktop
+
 
 ## Email Configuration
 

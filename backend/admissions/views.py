@@ -6,14 +6,19 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
-from .models import AdmissionApplication, EmailVerification
+from django.db.models import Q
+from .models import AdmissionApplication, EmailVerification, SchoolAdmissionDecision
 from .serializers import (
     AdmissionApplicationSerializer, 
     AdmissionApplicationCreateSerializer,
     AdmissionReviewSerializer,
     AdmissionTrackingSerializer,
     EmailVerificationRequestSerializer,
-    EmailVerificationSerializer
+    EmailVerificationSerializer,
+    SchoolAdmissionDecisionSerializer,
+    SchoolDecisionUpdateSerializer,
+    StudentChoiceSerializer,
+    AdmissionApplicationWithDecisionsSerializer
 )
 from .email_service import send_otp_email, send_admission_confirmation_email
 
@@ -183,3 +188,163 @@ class AdmissionApplicationViewSet(viewsets.ModelViewSet):
             return Response(AdmissionApplicationSerializer(application).data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SchoolAdmissionReviewAPIView(APIView):
+    """API view for school-specific admission reviews"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get applications for the current user's school"""
+        try:
+            # Get the user's school directly from the user model
+            if not request.user.school:
+                return Response({
+                    'success': False,
+                    'message': 'Unable to determine school for user. Please contact administrator.',
+                    'timestamp': timezone.now().isoformat(),
+                    'errors': ['User has no school assigned']
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            school_id = request.user.school.id
+            
+            # Get all applications where this school is a preference
+            applications = AdmissionApplication.objects.filter(
+                Q(first_preference_school_id=school_id) |
+                Q(second_preference_school_id=school_id) |
+                Q(third_preference_school_id=school_id)
+            ).prefetch_related('school_decisions')
+            
+            serializer = AdmissionApplicationWithDecisionsSerializer(applications, many=True)
+            
+            return Response({
+                'success': True,
+                'count': len(applications),
+                'results': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error fetching applications: {str(e)}',
+                'timestamp': timezone.now().isoformat(),
+                'errors': [str(e)]
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SchoolDecisionUpdateAPIView(APIView):
+    """API view for updating school admission decisions"""
+    permission_classes = [IsAuthenticated]
+    
+    def patch(self, request, decision_id):
+        """Update a school admission decision"""
+        try:
+            decision = SchoolAdmissionDecision.objects.get(id=decision_id)
+        except SchoolAdmissionDecision.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Decision not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = SchoolDecisionUpdateSerializer(decision, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            decision = serializer.save(reviewed_by=request.user)
+            
+            return Response({
+                'success': True,
+                'data': SchoolAdmissionDecisionSerializer(decision).data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StudentChoiceAPIView(APIView):
+    """API view for students to choose among accepted schools"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Student selects their preferred school among accepted ones"""
+        reference_id = request.data.get('reference_id')
+        school_decision_id = request.data.get('school_decision_id')
+        
+        if not reference_id or not school_decision_id:
+            return Response({
+                'success': False,
+                'message': 'Reference ID and school decision ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            application = AdmissionApplication.objects.get(reference_id=reference_id)
+            decision = SchoolAdmissionDecision.objects.get(
+                id=school_decision_id, 
+                application=application,
+                decision='accepted'
+            )
+        except (AdmissionApplication.DoesNotExist, SchoolAdmissionDecision.DoesNotExist):
+            return Response({
+                'success': False,
+                'message': 'Invalid reference ID or school decision'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Reset all choices for this application
+        SchoolAdmissionDecision.objects.filter(
+            application=application,
+            is_student_choice=True
+        ).update(is_student_choice=False, student_choice_date=None)
+        
+        # Set the selected choice
+        decision.is_student_choice = True
+        decision.student_choice_date = timezone.now()
+        decision.save()
+        
+        return Response({
+            'success': True,
+            'message': f'Successfully selected {decision.school.school_name}',
+            'data': SchoolAdmissionDecisionSerializer(decision).data
+        })
+
+
+class AcceptedSchoolsAPIView(APIView):
+    """API view to get accepted schools for an application"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """Get all accepted schools for an application"""
+        reference_id = request.query_params.get('reference_id')
+        
+        if not reference_id:
+            return Response({
+                'success': False,
+                'message': 'Reference ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            application = AdmissionApplication.objects.get(reference_id=reference_id)
+            accepted_decisions = SchoolAdmissionDecision.objects.filter(
+                application=application,
+                decision='accepted'
+            ).select_related('school')
+            
+            if not accepted_decisions.exists():
+                return Response({
+                    'success': False,
+                    'message': 'No schools have accepted this application yet'
+                })
+            
+            serializer = SchoolAdmissionDecisionSerializer(accepted_decisions, many=True)
+            
+            return Response({
+                'success': True,
+                'data': serializer.data,
+                'has_student_choice': any(d.is_student_choice for d in accepted_decisions)
+            })
+            
+        except AdmissionApplication.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Application not found'
+            }, status=status.HTTP_404_NOT_FOUND)

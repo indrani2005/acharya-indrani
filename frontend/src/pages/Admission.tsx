@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { admissionService, schoolService } from "@/lib/api/services";
 import { extractApiData, extractErrorMessage } from "@/lib/utils/apiHelpers";
-import { School, AdmissionTrackingResponse } from "@/lib/api/types";
+import { School, AdmissionTrackingResponse, SchoolAdmissionDecision } from "@/lib/api/types";
 
 interface AdmissionFormData {
   applicant_name: string;
@@ -47,6 +47,8 @@ const Admission = () => {
   const [trackingResult, setTrackingResult] = useState<AdmissionTrackingResponse | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [acceptedSchools, setAcceptedSchools] = useState<SchoolAdmissionDecision[]>([]);
+  const [isSubmittingChoice, setIsSubmittingChoice] = useState(false);
   
   // Email verification states
   const [isEmailVerified, setIsEmailVerified] = useState(false);
@@ -114,7 +116,21 @@ const Admission = () => {
       const result = await admissionService.trackApplication(trackingId.trim());
       setTrackingResult(result);
       
-      if (!result.success) {
+      if (result.success && result.data) {
+        // Also fetch accepted schools for student choice
+        try {
+          const acceptedResult = await admissionService.getAcceptedSchools(trackingId.trim());
+          if (acceptedResult.success) {
+            // Handle both array and paginated response
+            const acceptedData = Array.isArray(acceptedResult.data) 
+              ? acceptedResult.data 
+              : acceptedResult.data.results || [];
+            setAcceptedSchools(acceptedData);
+          }
+        } catch (error) {
+          console.error('Error fetching accepted schools:', error);
+        }
+      } else {
         toast({
           title: "Not Found",
           description: result.message || "No application found with this reference ID",
@@ -130,6 +146,38 @@ const Admission = () => {
       setTrackingResult(null);
     } finally {
       setIsTracking(false);
+    }
+  };
+
+  const handleStudentChoice = async (chosenSchool: string) => {
+    if (!trackingResult?.data?.reference_id) return;
+
+    setIsSubmittingChoice(true);
+    try {
+      const result = await admissionService.submitStudentChoice({
+        reference_id: trackingResult.data.reference_id,
+        chosen_school: chosenSchool
+      });
+
+      if (result.success) {
+        toast({
+          title: "Choice Submitted",
+          description: "Your school choice has been submitted successfully!",
+        });
+        
+        // Refresh tracking data
+        await handleTrackApplication();
+      } else {
+        throw new Error(result.message || 'Failed to submit choice');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit your choice. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingChoice(false);
     }
   };
 
@@ -552,7 +600,7 @@ const Admission = () => {
                           <span>{trackingResult.data.course_applied}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Status:</span>
+                          <span>Overall Status:</span>
                           <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(trackingResult.data.status)}`}>
                             {trackingResult.data.status.replace('_', ' ').toUpperCase()}
                           </span>
@@ -561,12 +609,77 @@ const Admission = () => {
                           <span>Applied:</span>
                           <span>{new Date(trackingResult.data.application_date).toLocaleDateString()}</span>
                         </div>
+                        
+                        {/* School Preferences */}
                         {trackingResult.data.first_preference_school && (
                           <div className="flex justify-between">
                             <span>1st Preference:</span>
                             <span>{trackingResult.data.first_preference_school.school_name}</span>
                           </div>
                         )}
+                        {trackingResult.data.second_preference_school && (
+                          <div className="flex justify-between">
+                            <span>2nd Preference:</span>
+                            <span>{trackingResult.data.second_preference_school.school_name}</span>
+                          </div>
+                        )}
+                        {trackingResult.data.third_preference_school && (
+                          <div className="flex justify-between">
+                            <span>3rd Preference:</span>
+                            <span>{trackingResult.data.third_preference_school.school_name}</span>
+                          </div>
+                        )}
+
+                        {/* School Decisions */}
+                        {trackingResult.data.school_decisions && trackingResult.data.school_decisions.length > 0 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h5 className="font-medium mb-2">School Review Status</h5>
+                            <div className="space-y-2">
+                              {trackingResult.data.school_decisions.map((decision, index) => (
+                                <div key={index} className="flex justify-between items-center">
+                                  <span>{decision.school_name || decision.school}</span>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    decision.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                    decision.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {decision.status.toUpperCase()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Student Choice Interface */}
+                        {acceptedSchools.length > 1 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h5 className="font-medium mb-2 text-green-700">🎉 Multiple Acceptances!</h5>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              Congratulations! You've been accepted to multiple schools. Please choose which school you'd like to attend:
+                            </p>
+                            <div className="space-y-2">
+                              {acceptedSchools.map((school, index) => (
+                                <Button
+                                  key={index}
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start"
+                                  onClick={() => handleStudentChoice(school.school)}
+                                  disabled={isSubmittingChoice}
+                                >
+                                  {isSubmittingChoice ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                  )}
+                                  Choose {school.school_name || school.school}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {trackingResult.data.review_comments && (
                           <div className="mt-2">
                             <span className="font-medium">Comments:</span>

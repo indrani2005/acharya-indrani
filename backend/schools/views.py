@@ -47,11 +47,12 @@ class SchoolStatsAPIView(APIView):
         
         # Get the school for this admin user
         try:
-            if user.role == 'Management' and user.school:
+            # Allow admin, management, and staff roles to access school stats
+            if user.role.lower() in ['admin', 'management', 'staff', 'faculty'] and user.school:
                 school = user.school
             else:
                 return Response({
-                    'error': 'Access denied. Only Management users with assigned schools can access this data.'
+                    'error': f'Access denied. Only Admin/Management users with assigned schools can access this data. Your role: {user.role}'
                 }, status=status.HTTP_403_FORBIDDEN)
         except AttributeError:
             return Response({
@@ -112,11 +113,12 @@ class SchoolDashboardAPIView(APIView):
         
         # Get the school for this admin user
         try:
-            if user.role == 'Management' and user.school:
+            # Allow admin, management, and staff roles to access dashboard data
+            if user.role.lower() in ['admin', 'management', 'staff', 'faculty'] and user.school:
                 school = user.school
             else:
                 return Response({
-                    'error': 'Access denied. Only Management users with assigned schools can access this data.'
+                    'error': f'Access denied. Only Admin/Management users with assigned schools can access this data. Your role: {user.role}'
                 }, status=status.HTTP_403_FORBIDDEN)
         except AttributeError:
             return Response({

@@ -137,7 +137,46 @@ class AdmissionApplication(models.Model):
             # Ensure uniqueness
             while AdmissionApplication.objects.filter(reference_id=self.reference_id).exists():
                 self.reference_id = generate_reference_id()
+        
+        is_new = self.pk is None
         super().save(*args, **kwargs)
+        
+        # Create school decisions for new applications
+        if is_new:
+            self.create_school_decisions()
+    
+    def create_school_decisions(self):
+        """Create SchoolAdmissionDecision entries for each school preference"""
+        decisions_to_create = []
+        
+        if self.first_preference_school:
+            decisions_to_create.append(
+                SchoolAdmissionDecision(
+                    application=self,
+                    school=self.first_preference_school,
+                    preference_order='1st'
+                )
+            )
+        
+        if self.second_preference_school:
+            decisions_to_create.append(
+                SchoolAdmissionDecision(
+                    application=self,
+                    school=self.second_preference_school,
+                    preference_order='2nd'
+                )
+            )
+        
+        if self.third_preference_school:
+            decisions_to_create.append(
+                SchoolAdmissionDecision(
+                    application=self,
+                    school=self.third_preference_school,
+                    preference_order='3rd'
+                )
+            )
+        
+        SchoolAdmissionDecision.objects.bulk_create(decisions_to_create, ignore_conflicts=True)
     
     def __str__(self):
         first_school = self.first_preference_school.school_name if self.first_preference_school else "No School"
@@ -153,3 +192,49 @@ class AdmissionApplication(models.Model):
         if self.third_preference_school:
             preferences.append(('3rd', self.third_preference_school))
         return preferences
+
+
+class SchoolAdmissionDecision(models.Model):
+    """Model to track individual school decisions for each application"""
+    
+    DECISION_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('under_review', 'Under Review'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('waitlisted', 'Waitlisted'),
+    ]
+    
+    application = models.ForeignKey(AdmissionApplication, on_delete=models.CASCADE, related_name='school_decisions')
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='admission_decisions')
+    preference_order = models.CharField(max_length=10, choices=[('1st', 'First'), ('2nd', 'Second'), ('3rd', 'Third')])
+    decision = models.CharField(max_length=20, choices=DECISION_CHOICES, default='pending')
+    decision_date = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='school_admission_decisions'
+    )
+    review_comments = models.TextField(blank=True)
+    is_student_choice = models.BooleanField(default=False)  # True if student chose this school among accepted ones
+    student_choice_date = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['application', 'school']
+        indexes = [
+            models.Index(fields=['school', 'decision']),
+            models.Index(fields=['application', 'decision']),
+            models.Index(fields=['decision', 'decision_date']),
+        ]
+        ordering = ['preference_order', '-decision_date']
+    
+    def save(self, *args, **kwargs):
+        """Set decision date when decision is made"""
+        if self.decision != 'pending' and not self.decision_date:
+            self.decision_date = timezone.now()
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.application.applicant_name} - {self.school.school_name} ({self.decision})"
