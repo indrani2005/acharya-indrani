@@ -8,3 +8,5 @@ router.register(r'applications', views.AdmissionApplicationViewSet)
 urlpatterns = [
     path('', include(router.urls)),
 ]
+
+app_name = 'admissions'

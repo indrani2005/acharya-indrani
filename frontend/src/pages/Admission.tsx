@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,132 +8,179 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ArrowLeft, CheckCircle, Clock } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Upload, CheckCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { admissionService, AdmissionApplication } from "@/lib/api";
+import { admissionService, schoolService } from "@/lib/api/services";
+import { extractApiData, extractErrorMessage } from "@/lib/utils/apiHelpers";
+import { School } from "@/lib/api/types";
+
+interface AdmissionFormData {
+  applicant_name: string;
+  date_of_birth: string;
+  email: string;
+  phone_number: string;
+  address: string;
+  course_applied: string;
+  school: number | "";
+  previous_school: string;
+  last_percentage: number | "";
+  documents: File[];
+  guardian_name: string;
+  parent_contact: string;
+  acceptedTerms: boolean;
+}
 
 const Admission = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [applicationId, setApplicationId] = useState<number | null>(null);
+  const [submittedApplication, setSubmittedApplication] = useState<any>(null);
+  const [step, setStep] = useState(1);
   const [date, setDate] = useState<Date>();
-  const [formData, setFormData] = useState({
+  const [schools, setSchools] = useState<School[]>([]);
+  const [isLoadingSchools, setIsLoadingSchools] = useState(false);
+  const [formData, setFormData] = useState<AdmissionFormData>({
     applicant_name: "",
     date_of_birth: "",
-    course_applied: "",
-    phone_number: "",
     email: "",
+    phone_number: "",
     address: "",
+    course_applied: "",
+    school: "",
     previous_school: "",
     last_percentage: "",
+    documents: [],
+    guardian_name: "",
+    parent_contact: "",
+    acceptedTerms: false,
   });
-
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  // Fetch schools on component mount
+  useEffect(() => {
+    const fetchSchools = async () => {
+      setIsLoadingSchools(true);
+      try {
+        const response = await schoolService.getActiveSchools();
+        setSchools(response.data);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load schools. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingSchools(false);
+      }
+    };
+    
+    fetchSchools();
+  }, [toast]);
+
+  const handleInputChange = (field: keyof AdmissionFormData, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleDateChange = (selectedDate: Date | undefined) => {
-    setDate(selectedDate);
-    if (selectedDate) {
-      setFormData(prev => ({ 
-        ...prev, 
-        date_of_birth: format(selectedDate, "yyyy-MM-dd") 
-      }));
-    }
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFormData(prev => ({ ...prev, documents: [...prev.documents, ...files] }));
   };
 
-  const validateForm = () => {
-    if (!formData.applicant_name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter your full name",
-        variant: "destructive",
-      });
-      return false;
+  const removeFile = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      documents: prev.documents.filter((_, i) => i !== index)
+    }));
+  };
+
+  const isStepValid = useMemo(() => {
+    if (step === 1) {
+      return (
+        formData.applicant_name.trim().length > 1 &&
+        formData.date_of_birth &&
+        formData.course_applied &&
+        formData.school &&
+        formData.phone_number &&
+        formData.email &&
+        formData.address
+      );
+    }
+    if (step === 2) {
+      return formData.documents.length > 0;
+    }
+    if (step === 3) {
+      return true; // optional
+    }
+    if (step === 4) {
+      return formData.acceptedTerms;
+    }
+    return false;
+  }, [step, formData]);
+
+  const uploadDocuments = async (applicationId: number, documents: File[]): Promise<void> => {
+    // This would upload documents to your file storage
+    // For now, we'll simulate this process
+    const documentPaths: Record<string, string> = {};
+    
+    for (let i = 0; i < documents.length; i++) {
+      const file = documents[i];
+      // In a real implementation, you would upload to cloud storage
+      // and get back the URL/path
+      documentPaths[`document_${i + 1}`] = `uploads/${applicationId}/${file.name}`;
     }
 
-    if (!formData.date_of_birth) {
-      toast({
-        title: "Validation Error",
-        description: "Please select your date of birth",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.course_applied) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a course",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.phone_number || formData.phone_number.length < 10) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid phone number",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.address.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter your address",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
+    // For now, we'll just log the document paths
+    // In a real implementation, you would update the application
+    console.log('Document paths:', documentPaths);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    if (step < 4) {
+      if (isStepValid) setStep(prev => prev + 1);
       return;
     }
+
+    if (!isStepValid) return;
 
     setIsSubmitting(true);
 
     try {
-      const applicationData: Partial<AdmissionApplication> = {
-        ...formData,
-        last_percentage: formData.last_percentage ? parseFloat(formData.last_percentage) : undefined,
+      // Prepare the application data
+      const applicationData = {
+        applicant_name: formData.applicant_name,
+        date_of_birth: formData.date_of_birth,
+        email: formData.email,
+        phone_number: formData.phone_number,
+        address: formData.address,
+        course_applied: formData.course_applied,
+        previous_school: formData.previous_school || "",
+        last_percentage: formData.last_percentage || null,
       };
 
-      const response = await admissionService.submitApplication(applicationData);
-      
-      setApplicationId(response.id!);
+      // Submit the application
+      const application = await admissionService.submitApplication(applicationData);
+
+      // Upload documents if any
+      if (formData.documents.length > 0) {
+        await uploadDocuments((application as any).id, formData.documents);
+      }
+
+      setSubmittedApplication(application);
       setIsSubmitted(true);
       
       toast({
         title: "Application Submitted Successfully!",
-        description: `Your application has been received. Reference ID: ${response.id}`,
+        description: `Your admission application has been received. Reference ID: ${(application as any).id}`,
       });
     } catch (error: any) {
-      console.error("Submission error:", error);
+      console.error('Error submitting application:', error);
       toast({
         title: "Submission Failed",
-        description: error.error || "Failed to submit application. Please try again.",
+        description: extractErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -143,9 +190,9 @@ const Admission = () => {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <Card className="shadow-2xl text-center">
+          <Card className="shadow-2xl text-center border-0">
             <CardHeader>
               <div className="flex justify-center mb-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -158,50 +205,50 @@ const Admission = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-green-800">
-                  <strong>Application ID:</strong> {applicationId}
-                </p>
-                <p className="text-sm text-green-800 mt-1">
-                  We will review your application and contact you within 3-5 business days.
-                </p>
-              </div>
-              
-              <div className="space-y-2 text-sm text-gray-600">
-                <p><strong>What's Next?</strong></p>
-                <ul className="list-disc list-inside space-y-1 text-left">
-                  <li>Application review by admissions team</li>
-                  <li>Document verification</li>
-                  <li>Interview scheduling (if required)</li>
-                  <li>Final admission decision</li>
-                </ul>
-              </div>
+              {submittedApplication && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm font-medium">Application Reference ID:</p>
+                  <p className="text-lg font-bold text-blue-600">#{(submittedApplication as any).id}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Please save this reference ID for future correspondence.
+                  </p>
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                We will review your application and contact you within 3-5 business days.
+              </p>
 
-              <div className="flex flex-col gap-2">
+              <div className="space-y-2">
                 <Button 
-                  onClick={() => navigate("/")}
-                  className="w-full"
+                  className="w-full bg-gradient-primary text-white" 
+                  onClick={() => navigate('/auth')}
                 >
-                  Back to Home
+                  Back to Portal
                 </Button>
                 <Button 
                   variant="outline" 
+                  className="w-full"
                   onClick={() => {
                     setIsSubmitted(false);
-                    setApplicationId(null);
+                    setSubmittedApplication(null);
                     setFormData({
                       applicant_name: "",
                       date_of_birth: "",
-                      course_applied: "",
-                      phone_number: "",
                       email: "",
+                      phone_number: "",
                       address: "",
+                      course_applied: "",
+                      school: "",
                       previous_school: "",
                       last_percentage: "",
+                      documents: [],
+                      guardian_name: "",
+                      parent_contact: "",
+                      acceptedTerms: false,
                     });
                     setDate(undefined);
+                    setStep(1);
                   }}
-                  className="w-full"
                 >
                   Submit Another Application
                 </Button>
@@ -214,180 +261,373 @@ const Admission = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="mb-4 text-blue-600 hover:text-blue-800"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Admission Application</h1>
-          <p className="text-gray-600 mt-2">Join Acharya School and start your educational journey</p>
-        </div>
-
-        {/* Application Form */}
-        <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle>Student Information</CardTitle>
-            <CardDescription>
-              Please fill in all required information accurately
+    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl">
+        <Card className="shadow-2xl border-0 overflow-hidden">
+          <CardHeader className="text-center bg-gradient-primary text-white">
+            <div className="flex justify-center mb-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                <Upload className="h-8 w-8 text-white" />
+              </div>
+            </div>
+            <CardTitle className="text-3xl">Admission Application</CardTitle>
+            <CardDescription className="text-white/90">
+              Fill out the form below to apply for admission
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
+            {/* Step Progress */}
+            <div className="mb-6">
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {[1,2,3,4].map((s) => (
+                  <div key={s} className={`h-2 rounded-full ${step >= s ? 'bg-gradient-primary' : 'bg-muted'}`}></div>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Details</span>
+                <span>Documents</span>
+                <span>Additional</span>
+                <span>Terms</span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Personal Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Enter full name"
-                    value={formData.applicant_name}
-                    onChange={(e) => handleInputChange("applicant_name", e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Date of Birth *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={handleDateChange}
-                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        initialFocus
+              {step === 1 && (
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800">Step 1: Personal & Contact Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="applicant_name" className="text-gray-700">Full Name *</Label>
+                      <Input 
+                        id="applicant_name" 
+                        placeholder="Enter full name" 
+                        value={formData.applicant_name} 
+                        onChange={(e) => handleInputChange('applicant_name', e.target.value)} 
+                        required 
+                        className="border-gray-300 focus:border-primary focus:ring-primary"
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">Date of Birth *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className={cn(
+                              "w-full justify-start text-left font-normal border-gray-300", 
+                              !date && "text-muted-foreground"
+                            )}
+                          > 
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date ? format(date, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar 
+                            mode="single" 
+                            selected={date} 
+                            onSelect={(selectedDate) => { 
+                              setDate(selectedDate); 
+                              handleInputChange('date_of_birth', selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''); 
+                            }} 
+                            initialFocus 
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="course_applied" className="text-gray-700">Class/Course Applying For *</Label>
+                    <Select onValueChange={(value) => handleInputChange('course_applied', value)} required>
+                      <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                        <SelectValue placeholder="Select class or course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nursery">Nursery</SelectItem>
+                        <SelectItem value="lkg">LKG</SelectItem>
+                        <SelectItem value="ukg">UKG</SelectItem>
+                        {Array.from({length: 12}, (_, i) => i + 1).map((grade) => (
+                          <SelectItem key={grade} value={`class-${grade}`}>Class {grade}</SelectItem>
+                        ))}
+                        <SelectItem value="11th-science">11th Science</SelectItem>
+                        <SelectItem value="11th-commerce">11th Commerce</SelectItem>
+                        <SelectItem value="11th-arts">11th Arts</SelectItem>
+                        <SelectItem value="12th-science">12th Science</SelectItem>
+                        <SelectItem value="12th-commerce">12th Commerce</SelectItem>
+                        <SelectItem value="12th-arts">12th Arts</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="school" className="text-gray-700">Preferred School *</Label>
+                    <Select onValueChange={(value) => handleInputChange('school', parseInt(value))} required>
+                      <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                        <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select preferred school"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingSchools ? (
+                          <SelectItem value="loading" disabled>
+                            <div className="flex items-center">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Loading schools...
+                            </div>
+                          </SelectItem>
+                        ) : schools.length > 0 ? (
+                          schools.map((school) => (
+                            <SelectItem key={school.id} value={school.id.toString()}>
+                              {school.school_name} - {school.district}, {school.block}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-schools" disabled>
+                            No schools available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone_number" className="text-gray-700">Contact Number *</Label>
+                      <Input 
+                        id="phone_number" 
+                        type="tel" 
+                        placeholder="Enter contact number" 
+                        value={formData.phone_number} 
+                        onChange={(e) => handleInputChange('phone_number', e.target.value)} 
+                        required 
+                        className="border-gray-300 focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-gray-700">Email Address *</Label>
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="Enter email address" 
+                        value={formData.email} 
+                        onChange={(e) => handleInputChange('email', e.target.value)} 
+                        required 
+                        className="border-gray-300 focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address" className="text-gray-700">Complete Address *</Label>
+                    <Textarea 
+                      id="address" 
+                      placeholder="Enter complete address with pin code" 
+                      value={formData.address} 
+                      onChange={(e) => handleInputChange('address', e.target.value)} 
+                      required 
+                      rows={3} 
+                      className="border-gray-300 focus:border-primary focus:ring-primary"
+                    />
+                  </div>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="course">Course *</Label>
-                  <Select 
-                    value={formData.course_applied} 
-                    onValueChange={(value) => handleInputChange("course_applied", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Computer Science">Computer Science</SelectItem>
-                      <SelectItem value="Electronics">Electronics</SelectItem>
-                      <SelectItem value="Mechanical">Mechanical Engineering</SelectItem>
-                      <SelectItem value="Civil">Civil Engineering</SelectItem>
-                      <SelectItem value="Business Administration">Business Administration</SelectItem>
-                      <SelectItem value="Commerce">Commerce</SelectItem>
-                      <SelectItem value="Arts">Arts</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    placeholder="Enter phone number"
-                    value={formData.phone_number}
-                    onChange={(e) => handleInputChange("phone_number", e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Address *</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Enter full address"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange("address", e.target.value)}
-                    rows={3}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Academic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="previousSchool">Previous School</Label>
-                  <Input
-                    id="previousSchool"
-                    placeholder="Enter previous school name"
-                    value={formData.previous_school}
-                    onChange={(e) => handleInputChange("previous_school", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="percentage">Last Percentage</Label>
-                  <Input
-                    id="percentage"
-                    type="number"
-                    placeholder="Enter last exam percentage"
-                    value={formData.last_percentage}
-                    onChange={(e) => handleInputChange("last_percentage", e.target.value)}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/")}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Application"
+              {step === 2 && (
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800">Step 2: Upload Required Documents</h3>
+                  <div className="p-4 bg-muted/30 rounded-lg border">
+                    <h4 className="font-medium mb-2">Required Documents:</h4>
+                    <ul className="text-sm space-y-1 text-muted-foreground">
+                      <li>• Birth Certificate</li>
+                      <li>• Previous School Report Card/Transfer Certificate</li>
+                      <li>• Passport Size Photograph</li>
+                      <li>• Address Proof (Aadhar/Utility Bill)</li>
+                      <li>• Caste Certificate (if applicable)</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="documents" className="text-gray-700">Upload Documents *</Label>
+                    <Input 
+                      id="documents" 
+                      type="file" 
+                      multiple 
+                      accept=".pdf,.jpg,.jpeg,.png" 
+                      onChange={handleFileUpload} 
+                      className="cursor-pointer border-gray-300 focus:border-primary focus:ring-primary" 
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Upload: Birth Certificate, Previous Report Card, ID Proof (PDF, JPG, PNG - Max 5MB each)
+                    </p>
+                  </div>
+                  {formData.documents.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">Uploaded Files:</Label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {formData.documents.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                            <div>
+                              <span className="text-sm font-medium">{file.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                              </span>
+                            </div>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => removeFile(index)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800">Step 3: Additional Information (Optional)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="previous_school" className="text-gray-700">Previous School</Label>
+                      <Input 
+                        id="previous_school" 
+                        placeholder="Enter previous school name" 
+                        value={formData.previous_school} 
+                        onChange={(e) => handleInputChange('previous_school', e.target.value)} 
+                        className="border-gray-300 focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_percentage" className="text-gray-700">Last Exam Percentage</Label>
+                      <Input 
+                        id="last_percentage" 
+                        type="number" 
+                        placeholder="e.g. 86.5" 
+                        min="0" 
+                        max="100" 
+                        step="0.1"
+                        value={formData.last_percentage} 
+                        onChange={(e) => handleInputChange('last_percentage', e.target.value ? parseFloat(e.target.value) : "")} 
+                        className="border-gray-300 focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="guardian_name" className="text-gray-700">Guardian Name (if different from parent)</Label>
+                    <Input 
+                      id="guardian_name" 
+                      placeholder="Enter guardian name" 
+                      value={formData.guardian_name} 
+                      onChange={(e) => handleInputChange('guardian_name', e.target.value)} 
+                      className="border-gray-300 focus:border-primary focus:ring-primary"
+                    />
+                  </div>
+                  <div className="p-4 bg-muted/30 rounded-lg border">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> Additional information helps us better understand your academic background 
+                      and provide appropriate guidance during the admission process.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold text-gray-800">Step 4: Review & Submit</h3>
+                  
+                  {/* Application Summary */}
+                  <div className="p-4 bg-muted/20 rounded-lg border space-y-3">
+                    <h4 className="font-medium">Application Summary:</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Name:</span> 
+                        <span className="text-muted-foreground ml-1">{formData.applicant_name}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Email:</span> 
+                        <span className="text-muted-foreground ml-1">{formData.email}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Course:</span> 
+                        <span className="text-muted-foreground ml-1">{formData.course_applied}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Preferred School:</span> 
+                        <span className="text-muted-foreground ml-1">
+                          {schools.find(s => s.id === formData.school)?.school_name || 'Not selected'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Documents:</span> 
+                        <span className="text-muted-foreground ml-1">{formData.documents.length} files uploaded</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Terms and Conditions */}
+                  <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                    <h4 className="font-medium">Terms & Conditions</h4>
+                    <div className="text-sm space-y-2 text-muted-foreground">
+                      <p>By submitting this application, I hereby declare that:</p>
+                      <ul className="list-disc list-inside space-y-1 ml-4">
+                        <li>All information provided is true and correct to the best of my knowledge</li>
+                        <li>I understand that providing false information may result in rejection of the application</li>
+                        <li>I consent to the processing of my personal data for admission purposes</li>
+                        <li>I agree to abide by the institution's rules and regulations</li>
+                        <li>The documents submitted are authentic and verifiable</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3 p-3 bg-background border rounded-lg">
+                    <input 
+                      id="terms" 
+                      type="checkbox" 
+                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary" 
+                      checked={formData.acceptedTerms} 
+                      onChange={(e) => handleInputChange('acceptedTerms', e.target.checked)}
+                      aria-label="Accept terms and conditions"
+                    />
+                    <Label htmlFor="terms" className="text-sm cursor-pointer">
+                      I agree to the terms and conditions mentioned above *
+                    </Label>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => (step > 1 ? setStep(step - 1) : navigate('/auth'))}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  {step > 1 ? 'Back' : 'Back to Portal'}
                 </Button>
+                {step < 4 ? (
+                  <Button 
+                    type="submit" 
+                    disabled={!isStepValid}
+                    className="bg-gradient-primary text-white disabled:opacity-50"
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting || !isStepValid}
+                    className="bg-gradient-primary text-white disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Application'
+                    )}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>

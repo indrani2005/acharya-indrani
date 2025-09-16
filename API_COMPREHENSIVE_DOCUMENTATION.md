@@ -116,13 +116,62 @@ DELETE /staff/{id}/           - Delete staff
 ```
 Base URL: /api/v1/admissions/
 
-GET    /applications/         - List all applications
-POST   /applications/         - Submit new application
+GET    /applications/         - List all applications (admin only)
+POST   /applications/         - Submit new application (public)
 GET    /applications/{id}/    - Get application details
-PUT    /applications/{id}/    - Update application
-PATCH  /applications/{id}/    - Partial update (status change)
-DELETE /applications/{id}/    - Delete application
+PUT    /applications/{id}/    - Update application (admin only)
+PATCH  /applications/{id}/review/ - Review application (admin only)
+DELETE /applications/{id}/    - Delete application (admin only)
 ```
+
+#### 📤 Submit Application (POST /applications/)
+**Public endpoint** - No authentication required
+
+**Request Body:**
+```json
+{
+  "applicant_name": "John Doe",
+  "date_of_birth": "2005-05-15",
+  "email": "john.doe@email.com",
+  "phone_number": "1234567890",
+  "address": "123 Main St, City, State 12345",
+  "course_applied": "class-10",
+  "previous_school": "ABC School",
+  "last_percentage": 85.5
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Application submitted successfully",
+  "data": {
+    "id": 123,
+    "applicant_name": "John Doe",
+    "status": "pending",
+    "application_date": "2024-01-15T10:30:00Z",
+    // ... other fields
+  }
+}
+```
+
+#### 🔍 Review Application (PATCH /applications/{id}/review/)
+**Admin only** - Requires authentication
+
+**Request Body:**
+```json
+{
+  "status": "approved",
+  "review_comments": "Application meets all requirements"
+}
+```
+
+**Valid Status Values:**
+- `pending` - Initial status
+- `under_review` - Application being reviewed
+- `approved` - Application approved
+- `rejected` - Application rejected
 
 ### 💰 Fees Management
 ```

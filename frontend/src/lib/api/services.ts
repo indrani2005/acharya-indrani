@@ -1,5 +1,7 @@
 import { 
   AdmissionApplication,
+  School,
+  SchoolsResponse,
   FeeInvoice,
   Payment,
   AttendanceRecord,
@@ -16,6 +18,12 @@ import {
   ApiResponse
 } from './types';
 import { api } from './client';
+
+export const schoolService = {
+  // Get list of active schools for admission forms (public)
+  getActiveSchools: (): Promise<SchoolsResponse> =>
+    api.get('schools/public/'),
+};
 
 export const admissionService = {
   // Submit admission application

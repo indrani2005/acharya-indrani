@@ -11,6 +11,20 @@ export interface User {
   date_joined: string;
 }
 
+export interface School {
+  id: number;
+  school_name: string;
+  school_code: string;
+  district: string;
+  block: string;
+  village: string;
+}
+
+export interface SchoolsResponse {
+  success: boolean;
+  data: School[];
+}
+
 export interface StudentProfile {
   id: number;
   user: number;

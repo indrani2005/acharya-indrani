@@ -69,8 +69,10 @@ const createApiClient = (): AxiosInstance => {
 
       // Transform error response
       const apiError: ApiError = {
-        error: error.response?.data?.error || error.message || 'An error occurred',
-        details: error.response?.data?.details,
+        success: false,
+        message: error.response?.data?.message || error.message || 'An error occurred',
+        timestamp: new Date().toISOString(),
+        errors: error.response?.data?.errors || ['An error occurred'],
         status: error.response?.status,
       };
 

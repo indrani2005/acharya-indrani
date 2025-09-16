@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.db.models import Count, Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
@@ -20,6 +20,22 @@ class SchoolViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_class(self):
         from .serializers import SchoolSerializer
         return SchoolSerializer
+
+
+class PublicSchoolListAPIView(APIView):
+    """Public API view to get list of active schools for admission forms"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """Get list of active schools for public admission forms"""
+        schools = School.objects.filter(is_active=True).values(
+            'id', 'school_name', 'school_code', 'district', 'block', 'village'
+        ).order_by('district', 'block', 'school_name')
+        
+        return Response({
+            'success': True,
+            'data': list(schools)
+        })
 
 
 class SchoolStatsAPIView(APIView):
