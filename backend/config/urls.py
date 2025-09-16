@@ -29,6 +29,7 @@ urlpatterns = [
     
     # API v1 endpoints
     path('api/v1/users/', include('users.urls')),
+    path('api/v1/schools/', include('schools.urls')),
     path('api/v1/admissions/', include('admissions.urls')),
     path('api/v1/fees/', include('fees.urls')),
     path('api/v1/attendance/', include('attendance.urls')),
@@ -36,6 +37,7 @@ urlpatterns = [
     path('api/v1/hostel/', include('hostel.urls')),
     path('api/v1/library/', include('library.urls')),
     path('api/v1/notifications/', include('notifications.urls')),
+    path('api/v1/dashboard/', include('dashboard.urls')),
 ]
 
 # Serve media files in development

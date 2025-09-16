@@ -4,11 +4,16 @@ from .models import User, StudentProfile, ParentProfile, StaffProfile
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
+    date_joined = serializers.DateTimeField(source='created_at', read_only=True)
+    full_name = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'role', 'phone_number', 'is_active', 'date_joined']
+        read_only_fields = ['id', 'date_joined']
+    
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip()
 
 
 class LoginSerializer(serializers.Serializer):

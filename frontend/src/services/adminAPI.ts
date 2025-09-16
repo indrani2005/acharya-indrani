@@ -69,11 +69,14 @@ export interface UserData {
 }
 
 export const adminAPI = {
-  // Get school statistics
+  // Get school-specific statistics for the logged-in admin
   getSchoolStats: async (): Promise<SchoolStats> => {
     try {
-      // For now, return zero/empty values since we need to create these endpoints
-      // TODO: Replace with actual API calls when backend endpoints are ready
+      const response = await apiClient.get('/schools/stats/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching school stats:', error);
+      // Return default values if API fails
       return {
         totalStudents: 0,
         totalTeachers: 0,
@@ -83,24 +86,40 @@ export const adminAPI = {
         totalClasses: 0,
         currentSemester: "N/A",
         school: {
-          name: "Loading...",
+          name: "Error loading school data",
           code: "N/A",
           email: "N/A",
           phone: "N/A",
           address: "N/A"
         }
       };
+    }
+  },
+
+  // Get comprehensive dashboard data for the school
+  getDashboardData: async () => {
+    try {
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data;
     } catch (error) {
-      console.error('Error fetching school stats:', error);
-      throw error;
+      console.error('Error fetching dashboard data:', error);
+      return {
+        students: [],
+        teachers: [],
+        staff: [],
+        users: [],
+        fees: [],
+        attendance: [],
+        exams: []
+      };
     }
   },
 
   // Get all students
   getStudents: async (): Promise<Student[]> => {
     try {
-      const response = await apiClient.get('/users/students/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.students || [];
     } catch (error) {
       console.error('Error fetching students:', error);
       return [];
@@ -110,8 +129,8 @@ export const adminAPI = {
   // Get all teachers/faculty
   getTeachers: async (): Promise<Teacher[]> => {
     try {
-      const response = await apiClient.get('/users/staff/?role=faculty');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.teachers || [];
     } catch (error) {
       console.error('Error fetching teachers:', error);
       return [];
@@ -121,8 +140,8 @@ export const adminAPI = {
   // Get all staff
   getStaff: async (): Promise<Staff[]> => {
     try {
-      const response = await apiClient.get('/users/staff/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.staff || [];
     } catch (error) {
       console.error('Error fetching staff:', error);
       return [];
@@ -132,8 +151,8 @@ export const adminAPI = {
   // Get all users for user management
   getAllUsers: async (): Promise<UserData[]> => {
     try {
-      const response = await apiClient.get('/users/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.users || [];
     } catch (error) {
       console.error('Error fetching users:', error);
       return [];
@@ -143,8 +162,8 @@ export const adminAPI = {
   // Get fees data
   getFeesData: async () => {
     try {
-      const response = await apiClient.get('/fees/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.fees || [];
     } catch (error) {
       console.error('Error fetching fees data:', error);
       return [];
@@ -154,8 +173,8 @@ export const adminAPI = {
   // Get attendance data
   getAttendanceData: async () => {
     try {
-      const response = await apiClient.get('/attendance/records/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.attendance || [];
     } catch (error) {
       console.error('Error fetching attendance data:', error);
       return [];
@@ -165,8 +184,8 @@ export const adminAPI = {
   // Get exams data
   getExamsData: async () => {
     try {
-      const response = await apiClient.get('/exams/');
-      return response.data.results || [];
+      const response = await apiClient.get('/schools/dashboard/');
+      return response.data.exams || [];
     } catch (error) {
       console.error('Error fetching exams data:', error);
       return [];

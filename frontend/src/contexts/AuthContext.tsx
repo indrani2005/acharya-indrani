@@ -163,9 +163,9 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requiredRole, 
-  fallback = <div>Access denied</div> 
+  fallback 
 }) => {
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading, logout } = useAuth();
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -178,7 +178,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (requiredRole && user?.role !== requiredRole) {
-    return <>{fallback}</>;
+    return fallback ? <>{fallback}</> : (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-xl font-bold">Access Denied</h2>
+          <p>You don't have permission to access this page.</p>
+          <button 
+            onClick={() => logout()}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-38algy^1d_#sm)b&*un9)l4o!fn*=&=fl$biy@dpckx63-g-==
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver', '::1']
 
 
 # Application definition
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'drf_spectacular',
     # 'django_filters',  # Temporarily commented out
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
     "reports",
     "analytics",
     "schools",  # New schools app
+    "dashboard",  # Dashboard app
 ]
 
 MIDDLEWARE = [

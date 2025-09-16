@@ -543,3 +543,153 @@ response = client.auth.login(
 # Get student data
 students = client.users.students.list()
 ```
+
+## Schools API
+
+### School Statistics
+Get comprehensive statistics for the authenticated user's school.
+
+```http
+GET /schools/stats/
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "totalStudents": 150,
+  "totalTeachers": 25,
+  "totalStaff": 10,
+  "totalWardens": 3,
+  "activeParents": 120,
+  "totalClasses": 12,
+  "currentSemester": "Fall 2024",
+  "school": {
+    "name": "ABC International School",
+    "code": "ABC001",
+    "email": "admin@abcschool.edu",
+    "phone": "+1234567890",
+    "address": "123 Education Street, City, State"
+  }
+}
+```
+
+### Dashboard Data
+Get comprehensive dashboard data including all entities for the school.
+
+```http
+GET /schools/dashboard/
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "students": [
+    {
+      "id": 1,
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john.doe@school.edu",
+      "phone": "+1234567890",
+      "enrollment_date": "2024-01-15",
+      "class_name": "Grade 10-A",
+      "status": "active"
+    }
+  ],
+  "teachers": [
+    {
+      "id": 1,
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "email": "jane.smith@school.edu",
+      "phone": "+1234567891",
+      "department": "Mathematics",
+      "subjects": ["Algebra", "Geometry"],
+      "experience_years": 8
+    }
+  ],
+  "staff": [
+    {
+      "id": 1,
+      "first_name": "Bob",
+      "last_name": "Johnson",
+      "email": "bob.johnson@school.edu",
+      "phone": "+1234567892",
+      "department": "Administration",
+      "position": "Office Manager",
+      "hire_date": "2023-06-01"
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "email": "user@school.edu",
+      "first_name": "User",
+      "last_name": "Name",
+      "role": "student",
+      "is_active": true,
+      "last_login": "2024-01-20T10:30:00Z"
+    }
+  ],
+  "fees": [],
+  "attendance": [],
+  "exams": []
+}
+```
+
+**Error Response:**
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+## Error Handling
+
+All endpoints follow consistent error response patterns:
+
+### 401 Unauthorized
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "detail": "You do not have permission to perform this action."
+}
+```
+
+### 404 Not Found
+```json
+{
+  "detail": "Not found."
+}
+```
+
+### 400 Bad Request
+```json
+{
+  "field_name": ["This field is required."],
+  "email": ["Enter a valid email address."]
+}
+```
+
+## Frontend Integration Notes
+
+**Important:** When using the frontend API client, always use relative paths without the `/api/v1/` prefix:
+
+✅ **Correct:**
+```typescript
+const response = await apiClient.get('/schools/stats/');
+```
+
+❌ **Incorrect:**
+```typescript
+const response = await apiClient.get('/api/v1/schools/stats/'); // Causes 404!
+```
+
+See [API Path Best Practices](./API_PATH_BEST_PRACTICES.md) for detailed guidelines.

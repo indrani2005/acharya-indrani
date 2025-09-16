@@ -8,4 +8,8 @@ router.register(r'borrow-records', views.BookBorrowRecordViewSet, basename='borr
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Add alias routes for frontend compatibility
+    path('borrow/', views.BookBorrowRecordViewSet.as_view({'get': 'list', 'post': 'create'}), name='borrow-list'),
+    path('borrow/<int:pk>/', views.BookBorrowRecordViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update'}), name='borrow-detail'),
+    path('borrow/<int:pk>/return/', views.BookBorrowRecordViewSet.as_view({'post': 'return_book'}), name='borrow-return'),
 ]

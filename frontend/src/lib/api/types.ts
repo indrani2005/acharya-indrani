@@ -97,20 +97,24 @@ export interface AttendanceRecord {
   id: number;
   session: number;
   student: number;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'excused';
   marked_by: number;
-  marked_date: string;
+  marked_at: string;
+  remarks?: string;
 }
 
 export interface ClassSession {
   id: number;
+  school?: number;
   course: string;
   subject: string;
+  batch: string;
   date: string;
   start_time: string;
   end_time: string;
   faculty: number;
   faculty_name?: string;
+  created_at?: string;
 }
 
 export interface Exam {
@@ -136,19 +140,29 @@ export interface ExamResult {
 export interface HostelRoom {
   id: number;
   room_number: string;
-  block: string;
+  block: number;
+  block_name?: string;
+  school_name?: string;
   room_type: 'single' | 'double' | 'triple';
   capacity: number;
   current_occupancy: number;
   is_available: boolean;
+  availability_status?: 'full' | 'partial' | 'empty';
 }
 
 export interface HostelAllocation {
   id: number;
   student: number;
+  student_name?: string;
+  student_email?: string;
   room: number;
+  room_number?: string;
+  block_name?: string;
   allocation_date: string;
-  status: 'active' | 'inactive' | 'pending';
+  vacation_date?: string;
+  status: 'active' | 'vacated' | 'suspended';
+  allocated_by?: number;
+  allocated_by_name?: string;
 }
 
 export interface Book {
@@ -194,25 +208,36 @@ export interface UserNotification {
 }
 
 export interface ApiResponse<T> {
-  count?: number;
-  next?: string;
-  previous?: string;
-  results: T;
+  success: boolean;
+  message: string;
+  timestamp: string;
+  data: {
+    results: T;
+    pagination?: {
+      count: number;
+      next?: string;
+      previous?: string;
+      page_size: number;
+      total_pages: number;
+      current_page: number;
+    };
+  } | T;
 }
 
 export interface ApiError {
-  error: string;
-  details?: Record<string, string[]>;
+  success: false;
+  message: string;
+  timestamp: string;
+  errors: Record<string, string[]> | string[];
   status?: number;
 }
 
 export interface DashboardStats {
-  totalStudents?: number;
-  totalParents?: number;
-  totalStaff?: number;
-  pendingAdmissions?: number;
-  pendingFees?: number;
-  todayAttendance?: number;
-  libraryBooks?: number;
-  hostelOccupancy?: number;
+  total_students?: number;
+  total_parents?: number;
+  total_staff?: number;
+  applications_this_month?: number;
+  pending_fees?: number;
+  recent_notices?: number;
+  timestamp?: string;
 }

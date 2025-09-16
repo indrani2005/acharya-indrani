@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import EnhancedDashboardLayout from "@/components/EnhancedDashboardLayout";
+import { extractPromiseData, extractApiData } from "@/lib/utils/apiHelpers";
 import { 
   Calendar, 
   BarChart3, 
@@ -95,11 +96,11 @@ const StudentDashboard = () => {
       ]);
 
       setData({
-        fees: feesData.status === 'fulfilled' ? feesData.value.results : [],
-        attendance: attendanceData.status === 'fulfilled' ? attendanceData.value.results : [],
-        results: resultsData.status === 'fulfilled' ? resultsData.value.results : [],
-        borrowedBooks: libraryData.status === 'fulfilled' ? libraryData.value.results : [],
-        notices: noticesData.status === 'fulfilled' ? noticesData.value.results : [],
+        fees: extractPromiseData(feesData),
+        attendance: extractPromiseData(attendanceData),
+        results: extractPromiseData(resultsData),
+        borrowedBooks: extractPromiseData(libraryData),
+        notices: extractPromiseData(noticesData),
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -127,7 +128,7 @@ const StudentDashboard = () => {
       
       // Reload fees data
       const feesData = await feeService.getInvoices({ student: user?.id });
-      setData(prev => ({ ...prev, fees: feesData.results }));
+      setData(prev => ({ ...prev, fees: extractApiData(feesData) }));
     } catch (error: any) {
       toast({
         title: "Payment Failed",
@@ -468,7 +469,7 @@ const StudentDashboard = () => {
                 <TableBody>
                   {data.attendance.slice(0, 10).map((record) => (
                     <TableRow key={record.id}>
-                      <TableCell>{new Date(record.marked_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{new Date(record.marked_at).toLocaleDateString()}</TableCell>
                       <TableCell>{'General'}</TableCell>
                       <TableCell>
                         <Badge variant={record.status === 'present' ? "default" : "destructive"}>
