@@ -1,10 +1,9 @@
 from django.shortcuts import render
 from django.db import models
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from .models import Notice, UserNotification
 from .serializers import NoticeSerializer, UserNotificationSerializer, UserNotificationDetailSerializer
@@ -15,8 +14,8 @@ class NoticeViewSet(viewsets.ModelViewSet):
     queryset = Notice.objects.all()
     serializer_class = NoticeSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['priority', 'target_roles', 'is_sticky', 'is_active']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'content', 'priority', 'target_roles']
     ordering = ['-is_sticky', '-priority', '-publish_date']
     
     def get_queryset(self):
@@ -61,8 +60,8 @@ class UserNotificationViewSet(viewsets.ModelViewSet):
     """ViewSet for UserNotification model"""
     serializer_class = UserNotificationSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['is_read', 'notice__priority']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['notice__title', 'notice__content']
     ordering = ['-notice__publish_date']
     
     def get_queryset(self):

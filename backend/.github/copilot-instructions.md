@@ -52,6 +52,7 @@ parents/          # Parent portal app (empty scaffold)
 - **Create/apply migrations:** `uv run manage.py makemigrations && uv run manage.py migrate`
 - **Create superuser:** `uv run manage.py createsuperuser`
 - **Install dependencies:** `uv sync` or `pip install -r requirements.txt`
+- **Install new package:** `uv add <package-name>`
 
 ## Architecture Reference
 - See `ARCHITECTURE.md` for comprehensive design blueprints and planned features

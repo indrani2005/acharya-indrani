@@ -105,10 +105,10 @@ const Auth = () => {
     },
     {
       id: "admin",
-      name: "Administrator",
+      name: "Management",
       icon: Settings,
-      description: "Complete system administration and management",
-      demoCredentials: { email: "admin@acharya.edu", password: "admin123" }
+      description: "Complete school administration and management oversight",
+      demoCredentials: { email: "admin@02402.rj.gov.in", password: "admin#02402" }
     }
   ];
 

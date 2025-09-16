@@ -1,10 +1,9 @@
 from django.shortcuts import render
 from django.db import models
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from .models import Exam, ExamResult
 from .serializers import ExamSerializer, ExamResultSerializer, ExamResultDetailSerializer
 
@@ -14,8 +13,8 @@ class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all()
     serializer_class = ExamSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['exam_type', 'course', 'subject', 'semester']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['exam_type', 'course', 'subject', 'semester']
     ordering = ['-date', '-created_at']
 
 
@@ -23,8 +22,8 @@ class ExamResultViewSet(viewsets.ModelViewSet):
     """ViewSet for ExamResult model"""
     serializer_class = ExamResultSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['exam__course', 'exam__subject', 'exam__semester', 'grade']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['exam__course', 'exam__subject', 'exam__semester', 'grade']
     ordering = ['-exam__date', '-entered_at']
     
     def get_queryset(self):

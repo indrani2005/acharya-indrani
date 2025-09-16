@@ -20,495 +20,644 @@ import {
   Bell,
   Shield,
   Database,
-  Clock
+  Clock,
+  GraduationCap,
+  BookOpen,
+  CreditCard,
+  UserCheck,
+  School,
+  Home,
+  DollarSign,
+  Activity,
+  UserPlus,
+  FileX,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from "recharts";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminAPI, SchoolStats, Student, Teacher, Staff, UserData } from "@/services/adminAPI";
 
-const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState("home");
-  const [now, setNow] = useState<Date>(new Date());
+export default function AdminDashboard() {
+  const { user, profile } = useAuth();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterClass, setFilterClass] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Real data states
+  const [schoolStats, setSchoolStats] = useState<SchoolStats>({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalStaff: 0,
+    totalWardens: 0,
+    activeParents: 0,
+    totalClasses: 0,
+    currentSemester: "N/A",
+    school: {
+      name: "Loading...",
+      code: "N/A",
+      email: "N/A",
+      phone: "N/A",
+      address: "N/A"
+    }
+  });
   
+  const [studentsData, setStudentsData] = useState<Student[]>([]);
+  const [teachersData, setTeachersData] = useState<Teacher[]>([]);
+  const [staffData, setStaffData] = useState<Staff[]>([]);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [feesData, setFeesData] = useState<any[]>([]);
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [examsData, setExamsData] = useState<any[]>([]);
+
+  const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
+
+  // Load data on component mount
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load all data concurrently
+        const [
+          stats,
+          students,
+          teachers,
+          staff,
+          users,
+          fees,
+          attendance,
+          exams
+        ] = await Promise.all([
+          adminAPI.getSchoolStats(),
+          adminAPI.getStudents(),
+          adminAPI.getTeachers(),
+          adminAPI.getStaff(),
+          adminAPI.getAllUsers(),
+          adminAPI.getFeesData(),
+          adminAPI.getAttendanceData(),
+          adminAPI.getExamsData()
+        ]);
+
+        setSchoolStats(stats);
+        setStudentsData(students);
+        setTeachersData(teachers);
+        setStaffData(staff);
+        setAllUsers(users);
+        setFeesData(fees);
+        setAttendanceData(attendance);
+        setExamsData(exams);
+
+      } catch (err) {
+        setError('Failed to load dashboard data');
+        console.error('Dashboard data loading error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
-  const istString = new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    weekday: 'long',
-    month: 'long',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  }).format(now);
-  
-  // Mock user data
-  const user = { email: "admin@acharya.gov.in" };
-  const profile = { 
-    full_name: "Dr. Suresh Mehta", 
-    role: "admin",
-    designation: "Principal",
-    employee_id: "ADM001"
-  };
-
-  // Mock data
-  const schoolStats = [
-    { title: "Total Students", value: "1250", change: "+5%", trend: "up" },
-    { title: "Total Faculty", value: "45", change: "+2%", trend: "up" },
-    { title: "Total Classes", value: "25", change: "0%", trend: "stable" },
-    { title: "Active Users", value: "1295", change: "+3%", trend: "up" },
-  ];
-
-  const recentActivities = [
-    { action: "New Student Admission", user: "Rahul Sharma", time: "2 hours ago", type: "admission" },
-    { action: "Faculty Login", user: "Dr. Priya Singh", time: "3 hours ago", type: "login" },
-    { action: "Fee Payment", user: "Rajesh Kumar", time: "4 hours ago", type: "payment" },
-    { action: "Leave Approved", user: "Mr. Amit Patel", time: "5 hours ago", type: "approval" },
-  ];
-
-  const systemAlerts = [
-    { id: 1, type: "warning", message: "Low disk space on server", priority: "High", date: "2024-01-15" },
-    { id: 2, type: "info", message: "Scheduled maintenance tonight", priority: "Medium", date: "2024-01-15" },
-    { id: 3, type: "success", message: "Backup completed successfully", priority: "Low", date: "2024-01-14" },
-  ];
-
-  const userManagement = [
-    { name: "Dr. Priya Singh", role: "Faculty", department: "Mathematics", status: "Active", lastLogin: "Today" },
-    { name: "Mr. Rajesh Kumar", role: "Warden", department: "Hostel", status: "Active", lastLogin: "Yesterday" },
-    { name: "Rahul Sharma", role: "Student", class: "10th A", status: "Active", lastLogin: "Today" },
-    { name: "Rajesh Sharma", role: "Parent", student: "Rahul Sharma", status: "Active", lastLogin: "2 days ago" },
-  ];
-
-  // Mock datasets for aggregate analytics
-  const instituteTrend = [
-    { month: 'Apr', attendance: 88, feeCollection: 72, resultsAvg: 78 },
-    { month: 'May', attendance: 90, feeCollection: 75, resultsAvg: 80 },
-    { month: 'Jun', attendance: 87, feeCollection: 78, resultsAvg: 79 },
-    { month: 'Jul', attendance: 89, feeCollection: 82, resultsAvg: 81 },
-    { month: 'Aug', attendance: 91, feeCollection: 85, resultsAvg: 83 },
+  const sidebarItems = [
+    { id: "overview", label: "School Overview", icon: Building },
+    { id: "students", label: "Students", icon: GraduationCap },
+    { id: "teachers", label: "Teachers", icon: Users },
+    { id: "staff", label: "Staff", icon: UserCheck },
+    { id: "wardens", label: "Wardens", icon: Home },
+    { id: "fees", label: "Fees & Payments", icon: CreditCard },
+    { id: "attendance", label: "Attendance", icon: Calendar },
+    { id: "exams", label: "Examinations", icon: BookOpen },
+    { id: "users", label: "User Management", icon: Users },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+    { id: "reports", label: "Reports", icon: FileText },
+    { id: "settings", label: "Settings", icon: Settings }
   ];
 
   const sidebarContent = (
-    <div className="p-6 space-y-4">
-      <Accordion type="single" collapsible defaultValue="menu">
-        <AccordionItem value="menu">
-          <AccordionTrigger className="text-base">Dashboard Menu</AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-2 pt-2">
-              <Button variant={activeTab === "home" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("home")}><Clock className="h-4 w-4 mr-2"/> Home</Button>
-              <Button variant={activeTab === "overview" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("overview")}><TrendingUp className="h-4 w-4 mr-2"/> Overview</Button>
-              <Button variant={activeTab === "analytics" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("analytics")}><BarChart3 className="h-4 w-4 mr-2"/> Analytics</Button>
-              <Button variant={activeTab === "users" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("users")}><Users className="h-4 w-4 mr-2"/> User Management</Button>
-              <Button variant={activeTab === "reports" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("reports")}><BarChart3 className="h-4 w-4 mr-2"/> Reports & Analytics</Button>
-              <Button variant={activeTab === "system" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("system")}><Settings className="h-4 w-4 mr-2"/> System Settings</Button>
-              <Button variant={activeTab === "alerts" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("alerts")}><AlertCircle className="h-4 w-4 mr-2"/> System Alerts</Button>
-              <Button variant={activeTab === "logs" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("logs")}><FileText className="h-4 w-4 mr-2"/> Activity Logs</Button>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+    <div className="space-y-2">
+      {sidebarItems.map((item) => (
+        <Button
+          key={item.id}
+          variant={activeTab === item.id ? "default" : "ghost"}
+          className="w-full justify-start gap-2"
+          onClick={() => setActiveTab(item.id)}
+        >
+          <item.icon className="h-4 w-4" />
+          <span className="sidebar-label">{item.label}</span>
+        </Button>
+      ))}
     </div>
   );
 
+  const filterData = (data: any[], type: string) => {
+    let filtered = data;
+    
+    if (searchTerm) {
+      filtered = filtered.filter(item => 
+        Object.values(item).some(value => 
+          value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+    }
+    
+    if (filterClass !== "all" && type === "students") {
+      filtered = filtered.filter(item => item.course === filterClass);
+    }
+    
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(item => 
+        item.status?.toLowerCase() === filterStatus.toLowerCase() ||
+        item.is_active?.toString() === filterStatus
+      );
+    }
+    
+    return filtered;
+  };
+
+  const renderFilters = (showClassFilter = false) => (
+    <div className="flex flex-wrap gap-4 mb-6">
+      <div className="flex-1 min-w-[200px]">
+        <Label htmlFor="search">Search</Label>
+        <Input
+          id="search"
+          placeholder="Search by name, email, or any field..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      {showClassFilter && (
+        <div className="min-w-[150px]">
+          <Label htmlFor="class">Course/Class</Label>
+          <Select value={filterClass} onValueChange={setFilterClass}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select course" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Courses</SelectItem>
+              {/* Dynamically populate based on available courses */}
+              <SelectItem value="10th">10th Standard</SelectItem>
+              <SelectItem value="11th">11th Standard</SelectItem>
+              <SelectItem value="12th">12th Standard</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="min-w-[150px]">
+        <Label htmlFor="status">Status</Label>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="true">Active</SelectItem>
+            <SelectItem value="false">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <EnhancedDashboardLayout
+        title="Management Dashboard - Loading..."
+        user={user}
+        profile={profile}
+        sidebarContent={sidebarContent}
+      >
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2 text-lg">Loading dashboard data...</span>
+        </div>
+      </EnhancedDashboardLayout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <EnhancedDashboardLayout
+        title="Management Dashboard - Error"
+        user={user}
+        profile={profile}
+        sidebarContent={sidebarContent}
+      >
+        <div className="flex items-center justify-center h-64">
+          <AlertCircle className="h-8 w-8 text-red-500" />
+          <span className="ml-2 text-lg text-red-500">{error}</span>
+        </div>
+      </EnhancedDashboardLayout>
+    );
+  }
+
+  const renderOverviewTab = () => (
+    <div className="space-y-6">
+      {/* School Info Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <School className="h-5 w-5" />
+            School Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-semibold text-lg">{schoolStats.school.name}</h3>
+              <p className="text-muted-foreground">School Code: {schoolStats.school.code}</p>
+              <p className="text-muted-foreground">Email: {schoolStats.school.email}</p>
+              <p className="text-muted-foreground">Phone: {schoolStats.school.phone}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Address:</p>
+              <p className="text-sm">{schoolStats.school.address}</p>
+              <p className="text-sm font-medium mt-2">Current Semester: {schoolStats.currentSemester}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold">{schoolStats.totalStudents}</p>
+                <p className="text-sm text-muted-foreground">Students</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold">{schoolStats.totalTeachers}</p>
+                <p className="text-sm text-muted-foreground">Teachers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-purple-500" />
+              <div>
+                <p className="text-2xl font-bold">{schoolStats.totalStaff}</p>
+                <p className="text-sm text-muted-foreground">Staff</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Home className="h-5 w-5 text-orange-500" />
+              <div>
+                <p className="text-2xl font-bold">{schoolStats.totalWardens}</p>
+                <p className="text-sm text-muted-foreground">Wardens</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Building className="h-5 w-5 text-red-500" />
+              <div>
+                <p className="text-2xl font-bold">{schoolStats.totalClasses}</p>
+                <p className="text-sm text-muted-foreground">Classes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-indigo-500" />
+              <div>
+                <p className="text-2xl font-bold">{allUsers.length}</p>
+                <p className="text-sm text-muted-foreground">Total Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            System Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 border rounded-lg">
+              <div className="w-2 h-2 rounded-full mt-2 bg-green-500" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">System running normally</p>
+                <p className="text-xs text-muted-foreground">All services operational</p>
+              </div>
+              <Badge variant="default">Active</Badge>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 border rounded-lg">
+              <div className="w-2 h-2 rounded-full mt-2 bg-blue-500" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Dashboard loaded successfully</p>
+                <p className="text-xs text-muted-foreground">Connected to backend API</p>
+              </div>
+              <Badge variant="secondary">Connected</Badge>
+            </div>
+            
+            {studentsData.length === 0 && (
+              <div className="flex items-start gap-3 p-3 border rounded-lg">
+                <div className="w-2 h-2 rounded-full mt-2 bg-yellow-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">No student data found</p>
+                  <p className="text-xs text-muted-foreground">Add students to see data</p>
+                </div>
+                <Badge variant="secondary">Empty</Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderStudentsTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Student Management</h2>
+        <Button>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add New Student
+        </Button>
+      </div>
+      
+      {renderFilters(true)}
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>All Students ({filterData(studentsData, "students").length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {studentsData.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No students found. Add students to get started.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Admission No.</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Course</TableHead>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filterData(studentsData, "students").map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-medium">{student.admission_number || 'N/A'}</TableCell>
+                    <TableCell>{`${student.user?.first_name || ''} ${student.user?.last_name || ''}`.trim() || 'N/A'}</TableCell>
+                    <TableCell>{student.user?.email || 'N/A'}</TableCell>
+                    <TableCell>{student.course || 'N/A'}</TableCell>
+                    <TableCell>{student.batch || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
+                        {student.status || 'Unknown'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline">View</Button>
+                        <Button size="sm" variant="outline">Edit</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderTeachersTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Teacher Management</h2>
+        <Button>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add New Teacher
+        </Button>
+      </div>
+      
+      {renderFilters()}
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>All Teachers ({filterData(teachersData, "teachers").length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {teachersData.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No teachers found. Add teachers to get started.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Designation</TableHead>
+                  <TableHead>Experience</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filterData(teachersData, "teachers").map((teacher) => (
+                  <TableRow key={teacher.id}>
+                    <TableCell className="font-medium">
+                      {`${teacher.user?.first_name || ''} ${teacher.user?.last_name || ''}`.trim() || 'N/A'}
+                    </TableCell>
+                    <TableCell>{teacher.user?.email || 'N/A'}</TableCell>
+                    <TableCell>{teacher.department || 'N/A'}</TableCell>
+                    <TableCell>{teacher.designation || 'N/A'}</TableCell>
+                    <TableCell>{teacher.experience_years ? `${teacher.experience_years} years` : 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={teacher.status === 'active' ? 'default' : 'secondary'}>
+                        {teacher.status || 'Unknown'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline">View</Button>
+                        <Button size="sm" variant="outline">Edit</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderUsersTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">User Management</h2>
+        <Button>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add New User
+        </Button>
+      </div>
+      
+      {renderFilters()}
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>All Users ({filterData(allUsers, "users").length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {allUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No users found.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filterData(allUsers, "users").map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A'}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{user.role}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                        {user.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline">View</Button>
+                        <Button size="sm" variant="outline">Edit</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Other tabs with empty data states
+  const renderEmptyTab = (title: string, description: string) => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">{title}</h2>
+      <Card>
+        <CardContent className="text-center py-16">
+          <div className="flex flex-col items-center gap-4">
+            <Database className="h-12 w-12 text-muted-foreground" />
+            <div>
+              <h3 className="text-lg font-semibold">No Data Available</h3>
+              <p className="text-muted-foreground">{description}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return renderOverviewTab();
+      case "students":
+        return renderStudentsTab();
+      case "teachers":
+        return renderTeachersTab();
+      case "users":
+        return renderUsersTab();
+      case "staff":
+        return renderEmptyTab("Staff Management", "Staff data will be displayed here when available.");
+      case "wardens":
+        return renderEmptyTab("Warden Management", "Warden data will be displayed here when available.");
+      case "fees":
+        return renderEmptyTab("Fee Management", "Fee data will be displayed here when available.");
+      case "attendance":
+        return renderEmptyTab("Attendance Management", "Attendance data will be displayed here when available.");
+      case "exams":
+        return renderEmptyTab("Examination Management", "Exam data will be displayed here when available.");
+      case "analytics":
+        return renderEmptyTab("Analytics", "Analytics data will be displayed here when available.");
+      case "reports":
+        return renderEmptyTab("Reports", "Reports will be displayed here when available.");
+      case "settings":
+        return renderEmptyTab("Settings", "System settings will be displayed here when available.");
+      default:
+        return renderOverviewTab();
+    }
+  };
+
   return (
     <EnhancedDashboardLayout
-      title="Admin Dashboard"
+      title={`Management Dashboard - ${schoolStats.school.name}`}
       user={user}
       profile={profile}
       sidebarContent={sidebarContent}
     >
-      <div className="space-y-6">
-        {activeTab === "home" && (
-          <Card className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white">
-            <CardContent className="p-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold mb-2">Welcome, {profile.full_name}!</h2>
-                  <p className="text-indigo-100 text-lg">{profile.designation} • ID: {profile.employee_id}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-indigo-100">Indian Standard Time</p>
-                  <p className="text-2xl font-semibold font-mono tracking-tight">{istString}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === "home" && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="hover:shadow-lg transition"><CardHeader className="pb-2"><CardTitle className="text-sm">Students</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">1250</div><p className="text-xs text-indigo-100/90">enrolled</p></CardContent></Card>
-            <Card className="hover:shadow-lg transition"><CardHeader className="pb-2"><CardTitle className="text-sm">Fee Collected</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">82%</div><p className="text-xs text-indigo-100/90">this month</p></CardContent></Card>
-            <Card className="hover:shadow-lg transition"><CardHeader className="pb-2"><CardTitle className="text-sm">Hostel Occupancy</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">91%</div><p className="text-xs text-indigo-100/90">current</p></CardContent></Card>
-            <Card className="hover:shadow-lg transition"><CardHeader className="pb-2"><CardTitle className="text-sm">Alerts</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">3</div><p className="text-xs text-indigo-100/90">open</p></CardContent></Card>
-          </div>
-        )}
-
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {schoolStats.map((stat, index) => (
-                <Card key={index}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">{stat.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className={stat.trend === "up" ? "text-green-600" : stat.trend === "down" ? "text-red-600" : "text-gray-600"}>
-                        {stat.change}
-                      </span> from last month
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activities</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {recentActivities.map((activity, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 border rounded-lg">
-                      <div className={`h-2 w-2 rounded-full ${
-                        activity.type === "admission" ? "bg-green-500" :
-                        activity.type === "login" ? "bg-blue-500" :
-                        activity.type === "payment" ? "bg-purple-500" :
-                        "bg-orange-500"
-                      }`} />
-                      <div className="flex-1">
-                        <p className="font-medium">{activity.action}</p>
-                        <p className="text-sm text-gray-600">{activity.user} • {activity.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Alerts</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {systemAlerts.map((alert) => (
-                    <div key={alert.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                      <AlertCircle className={`h-4 w-4 ${
-                        alert.priority === "High" ? "text-red-600" :
-                        alert.priority === "Medium" ? "text-yellow-600" :
-                        "text-green-600"
-                      }`} />
-                      <div className="flex-1">
-                        <p className="font-medium">{alert.message}</p>
-                        <p className="text-sm text-gray-600">{alert.date} • {alert.priority} Priority</p>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* User Management Tab */}
-        {activeTab === "users" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage all system users and their permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <Input placeholder="Search users..." className="flex-1" />
-                  <Select>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="student">Students</SelectItem>
-                      <SelectItem value="faculty">Faculty</SelectItem>
-                      <SelectItem value="parent">Parents</SelectItem>
-                      <SelectItem value="warden">Wardens</SelectItem>
-                      <SelectItem value="admin">Admins</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button>
-                    <Users className="h-4 w-4 mr-2" />
-                    Add User
-                  </Button>
-                </div>
-
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Department/Class</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Login</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {userManagement.map((user, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{user.role}</Badge>
-                        </TableCell>
-                        <TableCell>{user.department || user.class || user.student || "N/A"}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.status === "Active" ? "default" : "secondary"}>
-                            {user.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.lastLogin}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline">
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Reports & Analytics Tab */}
-        {activeTab === "reports" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Reports & Analytics</CardTitle>
-                <CardDescription>Generate and view system reports</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="outline" className="h-20 flex-col">
-                    <BarChart3 className="h-6 w-6 mb-2" />
-                    Attendance Report
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col">
-                    <Users className="h-6 w-6 mb-2" />
-                    Student Report
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col">
-                    <FileText className="h-6 w-6 mb-2" />
-                    Fee Report
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col">
-                    <Building className="h-6 w-6 mb-2" />
-                    Hostel Report
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col">
-                    <Calendar className="h-6 w-6 mb-2" />
-                    Academic Report
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col">
-                    <Database className="h-6 w-6 mb-2" />
-                    System Report
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* System Settings Tab */}
-        {activeTab === "system" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>Configure system-wide settings and preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">General Settings</h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="schoolName">School Name</Label>
-                      <Input id="schoolName" defaultValue="Acharya School" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="academicYear">Academic Year</Label>
-                      <Input id="academicYear" defaultValue="2024-25" />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Security Settings</h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input id="sessionTimeout" type="number" defaultValue="30" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="passwordPolicy">Password Policy</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select policy" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="basic">Basic</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="strong">Strong</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex space-x-4">
-                  <Button>
-                    <Shield className="h-4 w-4 mr-2" />
-                    Save Settings
-                  </Button>
-                  <Button variant="outline">
-                    Reset to Default
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* System Alerts Tab */}
-        {activeTab === "alerts" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>System Alerts</CardTitle>
-              <CardDescription>Monitor system health and alerts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {systemAlerts.map((alert) => (
-                  <div key={alert.id} className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <AlertCircle className={`h-5 w-5 ${
-                          alert.priority === "High" ? "text-red-600" :
-                          alert.priority === "Medium" ? "text-yellow-600" :
-                          "text-green-600"
-                        }`} />
-                        <div>
-                          <h3 className="font-medium">{alert.message}</h3>
-                          <p className="text-sm text-gray-600">{alert.date}</p>
-                        </div>
-                      </div>
-                      <Badge variant={
-                        alert.priority === "High" ? "destructive" :
-                        alert.priority === "Medium" ? "secondary" :
-                        "default"
-                      }>
-                        {alert.priority} Priority
-                      </Badge>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button size="sm" variant="outline">
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Acknowledge
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <FileText className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Activity Logs Tab */}
-        {activeTab === "logs" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity Logs</CardTitle>
-              <CardDescription>View system activity and audit logs</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <Input placeholder="Search logs..." className="flex-1" />
-                  <Select>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="login">Login</SelectItem>
-                      <SelectItem value="action">Actions</SelectItem>
-                      <SelectItem value="error">Errors</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input type="date" className="w-48" />
-                </div>
-
-                <div className="space-y-3">
-                  {recentActivities.map((activity, index) => (
-                    <div key={index} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{activity.action}</p>
-                          <p className="text-sm text-gray-600">User: {activity.user} • {activity.time}</p>
-                        </div>
-                        <Badge variant="outline">{activity.type}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === "analytics" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Attendance Trend (Institute)</CardTitle></CardHeader>
-              <CardContent style={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={instituteTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="attendance" stroke="#2563eb" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Fee Collection %</CardTitle></CardHeader>
-              <CardContent style={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={instituteTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="feeCollection" fill="#10b981" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
+      {renderTabContent()}
     </EnhancedDashboardLayout>
   );
-};
-
-export default AdminDashboard;
+}

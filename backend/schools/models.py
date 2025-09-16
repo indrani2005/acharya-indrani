@@ -36,12 +36,12 @@ class School(models.Model):
         return f"admin{self.school_code[-5:]}"
     
     def get_admin_password(self):
-        """Generate admin password from last 5 digits of school code"""
-        return self.school_code[-5:]
+        """Generate admin password in format: admin#{last5digits}"""
+        return f"admin#{self.school_code[-5:]}"
     
     def get_admin_email(self):
-        """Generate admin email in format: admin@{last5digits}.rj"""
-        return f"admin@{self.school_code[-5:]}.rj"
+        """Generate admin email in format: admin@{last5digits}.rj.gov.in"""
+        return f"admin@{self.school_code[-5:]}.rj.gov.in"
     
     def get_student_email(self, admission_number):
         """Generate student email in format: student.{admission_number}@{school_code_last5}.rj"""
@@ -99,8 +99,10 @@ def create_admin_for_school(school):
         # Update email to new format
         if existing_admin.email != admin_email:
             existing_admin.email = admin_email
-        existing_admin.save(update_fields=['school', 'is_active', 'email'])
-        print(f"Admin user updated for {school.school_name}: {username}")
+        # Update password to new format
+        existing_admin.set_password(password)
+        existing_admin.save()  # Save all changes including password
+        print(f"Admin user updated for {school.school_name}: {username}/{password} - {admin_email}")
         return existing_admin
     
     # Create new admin user with new email format

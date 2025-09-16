@@ -1,9 +1,8 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import ClassSession, AttendanceRecord
 from .serializers import ClassSessionSerializer, AttendanceRecordSerializer
@@ -14,8 +13,8 @@ class ClassSessionViewSet(viewsets.ModelViewSet):
     queryset = ClassSession.objects.all()
     serializer_class = ClassSessionSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['course', 'subject', 'batch', 'date', 'faculty']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['course', 'subject', 'batch', 'date', 'faculty']
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -43,8 +42,8 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
     queryset = AttendanceRecord.objects.all()
     serializer_class = AttendanceRecordSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['student', 'session', 'status', 'session__date']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['student', 'session', 'status']
 
     def get_queryset(self):
         queryset = super().get_queryset()

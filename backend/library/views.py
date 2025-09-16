@@ -1,9 +1,8 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import Book, BookBorrowRecord
 from .serializers import BookSerializer, BookBorrowRecordSerializer
@@ -14,8 +13,8 @@ class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['category', 'author', 'publisher', 'publication_year']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'author', 'isbn', 'category', 'publisher']
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -37,8 +36,8 @@ class BookBorrowRecordViewSet(viewsets.ModelViewSet):
     queryset = BookBorrowRecord.objects.all()
     serializer_class = BookBorrowRecordSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['student', 'book', 'status', 'borrowed_date']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['student__user__email', 'book__title', 'status']
 
     def get_queryset(self):
         queryset = super().get_queryset()
