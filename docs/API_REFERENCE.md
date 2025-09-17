@@ -1,25 +1,38 @@
 # Acharya ERP API Reference
 
 ## Overview
-Comprehensive API documentation for the Acharya Educational Resource Planning system. All APIs follow RESTful conventions with consistent JSON responses.
+Comprehensive API documentation for the Acharya Educational Resource Planning system. All APIs follow RESTful conventions with consistent JSON responses and JWT-based authentication.
 
-## Authentication
+## Base Configuration
+
+### Base URLs
+- **Development**: `http://localhost:8000/api/v1/`
+- **Production**: `https://your-domain.com/api/v1/`
+
+### Authentication
 All authenticated endpoints require a JWT token in the Authorization header:
 ```
-Authorization: Bearer <your_jwt_token>
+Authorization: Bearer <your_jwt_access_token>
 ```
 
-## Base URL
-- Development: `http://localhost:8000/api/v1/`
-- Production: `https://your-domain.com/api/v1/`
-
-## Response Format
+### Standard Response Format
 ```json
 {
   "success": true|false,
   "data": {...},
   "message": "Success/error message",
-  "errors": {...}  // Only on validation errors
+  "timestamp": "2025-09-17T12:00:00Z",
+  "errors": [...] // Only on validation errors
+}
+```
+
+### Pagination Format
+```json
+{
+  "count": 100,
+  "next": "http://localhost:8000/api/v1/endpoint/?page=3",
+  "previous": "http://localhost:8000/api/v1/endpoint/?page=1",
+  "results": [...]
 }
 ```
 
@@ -42,12 +55,542 @@ Content-Type: application/json
 **Response:**
 ```json
 {
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "role": "student",
+    "first_name": "John",
+    "last_name": "Doe",
+    "school": {
+      "id": 1,
+      "school_name": "Acharya Primary School"
+    }
+  }
+}
+```
+
+#### Logout
+```http
+POST /api/v1/users/auth/logout/
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+#### Get Current User
+```http
+GET /api/v1/users/auth/me/
+Authorization: Bearer <token>
+```
+
+## Schools API
+
+### Public School List
+Get list of active schools for admission forms (no authentication required).
+
+```http
+GET /api/v1/schools/public/
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "school_name": "Acharya Primary School",
+    "school_code": "APS001",
+    "address": "123 Education Street, Jaipur",
+    "phone_number": "+91-1234567890",
+    "email": "info@aps001.edu.in"
+  }
+]
+```
+
+### School Statistics
+Get comprehensive statistics for the logged-in admin's school.
+
+```http
+GET /api/v1/schools/stats/
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "totalStudents": 150,
+  "totalTeachers": 25,
+  "totalStaff": 8,
+  "totalWardens": 2,
+  "activeParents": 120,
+  "totalClasses": 12,
+  "currentSemester": "Academic Session 2024-25",
+  "school": {
+    "name": "Acharya Primary School",
+    "code": "APS001",
+    "email": "info@aps001.edu.in",
+    "phone": "+91-1234567890",
+    "address": "123 Education Street, Jaipur"
+  }
+}
+```
+
+### School Dashboard Data
+Get all dashboard data for the logged-in admin's school.
+
+```http
+GET /api/v1/schools/dashboard/
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "students": [...],
+  "teachers": [...],
+  "staff": [...],
+  "users": [...],
+  "fees": [],
+  "attendance": [],
+  "exams": []
+}
+```
+
+## Admissions API
+
+### Email Verification
+
+#### Request OTP
+```http
+POST /api/v1/admissions/verify-email/request/
+Content-Type: application/json
+
+{
+  "email": "student@example.com",
+  "applicant_name": "John Doe"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "OTP sent successfully to your email address.",
+  "expires_at": "2025-09-17T12:10:00Z"
+}
+```
+
+#### Verify OTP
+```http
+POST /api/v1/admissions/verify-email/verify/
+Content-Type: application/json
+
+{
+  "email": "student@example.com",
+  "otp": "123456"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully.",
+  "verification_token": "unique_token_for_application"
+}
+```
+
+### Application Management
+
+#### Submit Application
+```http
+POST /api/v1/admissions/applications/
+Content-Type: application/json
+
+{
+  "applicant_name": "John Doe",
+  "date_of_birth": "2005-06-15",
+  "email": "student@example.com",
+  "phone_number": "1234567890",
+  "address": "123 Main St, City, State 12345",
+  "course_applied": "Grade 10 - Science",
+  "category": "general",
+  "first_preference_school": 1,
+  "second_preference_school": 2,
+  "third_preference_school": null,
+  "previous_school": "Previous School Name",
+  "last_percentage": 85.5,
+  "email_verification_token": "unique_token"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "reference_id": "ADM-2025-A1B2C3",
+  "applicant_name": "John Doe",
+  "status": "pending",
+  "application_date": "2025-09-17T10:30:00Z",
+  "course_applied": "Grade 10 - Science",
+  "category": "general",
+  "school_preferences": [
+    {
+      "preference": 1,
+      "school": "Acharya Primary School"
+    }
+  ]
+}
+```
+
+#### Track Application
+```http
+GET /api/v1/admissions/track/?reference_id=ADM-2025-A1B2C3
+```
+
+**Response:**
+```json
+{
   "success": true,
   "data": {
-    "access": "jwt_access_token",
-    "refresh": "jwt_refresh_token",
-    "user": {
+    "reference_id": "ADM-2025-A1B2C3",
+    "applicant_name": "John Doe",
+    "course_applied": "Grade 10 - Science",
+    "category": "general",
+    "status": "under_review",
+    "application_date": "2025-09-17T10:30:00Z",
+    "school_decisions": [
+      {
+        "id": 1,
+        "school": {
+          "id": 1,
+          "school_name": "Acharya Primary School"
+        },
+        "preference_order": 1,
+        "decision": "accepted",
+        "enrollment_status": "enrolled",
+        "decision_date": "2025-09-18T14:30:00Z",
+        "enrollment_date": "2025-09-19T09:00:00Z",
+        "can_enroll": false,
+        "can_withdraw": true
+      }
+    ]
+  }
+}
+```
+
+### School Review System
+
+#### Get Applications for Review
+```http
+GET /api/v1/admissions/school-review/
+Authorization: Bearer <token>
+```
+
+#### Update School Decision
+```http
+PATCH /api/v1/admissions/school-decision/<decision_id>/
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "decision": "accepted",
+  "notes": "Excellent academic record and good interview performance"
+}
+```
+
+### Student Choice & Enrollment
+
+#### Get Accepted Schools
+```http
+GET /api/v1/admissions/accepted-schools/?reference_id=ADM-2025-A1B2C3
+```
+
+#### Submit Student Choice
+```http
+POST /api/v1/admissions/student-choice/
+Content-Type: application/json
+
+{
+  "reference_id": "ADM-2025-A1B2C3",
+  "chosen_school": "Acharya Primary School"
+}
+```
+
+#### Enroll Student
+```http
+POST /api/v1/admissions/enroll/
+Content-Type: application/json
+
+{
+  "reference_id": "ADM-2025-A1B2C3",
+  "school_name": "Acharya Primary School"
+}
+```
+
+#### Withdraw Enrollment
+```http
+POST /api/v1/admissions/withdraw/
+Content-Type: application/json
+
+{
+  "reference_id": "ADM-2025-A1B2C3",
+  "school_name": "Acharya Primary School",
+  "reason": "Changed preference"
+}
+```
+
+### Fee Calculation
+```http
+POST /api/v1/admissions/fee-calculation/
+Content-Type: application/json
+
+{
+  "course": "Grade 10 - Science",
+  "category": "general"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "course": "Grade 10 - Science",
+    "category": "general",
+    "fee_amount": 25000.00,
+    "fee_structure": {
       "id": 1,
+      "course": "class-10",
+      "category": "general",
+      "amount": 25000.00
+    }
+  }
+}
+```
+
+## User Management API
+
+### Students
+```http
+GET /api/v1/users/students/
+POST /api/v1/users/students/
+GET /api/v1/users/students/<id>/
+PATCH /api/v1/users/students/<id>/
+```
+
+### Parents
+```http
+GET /api/v1/users/parents/
+POST /api/v1/users/parents/
+GET /api/v1/users/parents/<id>/
+PATCH /api/v1/users/parents/<id>/
+```
+
+### Staff
+```http
+GET /api/v1/users/staff/
+POST /api/v1/users/staff/
+GET /api/v1/users/staff/<id>/
+PATCH /api/v1/users/staff/<id>/
+```
+
+## Fee Management API
+
+### Fee Structures
+```http
+GET /api/v1/fees/structures/
+POST /api/v1/fees/structures/
+```
+
+### Fee Invoices
+```http
+GET /api/v1/fees/invoices/
+GET /api/v1/fees/invoices/<id>/
+POST /api/v1/fees/invoices/<id>/pay/
+```
+
+**Pay Invoice Request:**
+```json
+{
+  "payment_method": "cash",
+  "transaction_id": "TXN123456"
+}
+```
+
+### Payments
+```http
+GET /api/v1/fees/payments/
+```
+
+## Attendance API
+
+### Class Sessions
+```http
+GET /api/v1/attendance/sessions/
+POST /api/v1/attendance/sessions/
+```
+
+### Attendance Records
+```http
+GET /api/v1/attendance/records/
+POST /api/v1/attendance/records/
+```
+
+## Examination API
+
+### Exams
+```http
+GET /api/v1/exams/exams/
+POST /api/v1/exams/exams/
+GET /api/v1/exams/exams/<id>/
+```
+
+### Exam Results
+```http
+GET /api/v1/exams/results/
+POST /api/v1/exams/results/
+GET /api/v1/exams/results/<id>/
+```
+
+## Hostel Management API
+
+### Rooms
+```http
+GET /api/v1/hostel/rooms/
+POST /api/v1/hostel/rooms/
+```
+
+### Allocations
+```http
+GET /api/v1/hostel/allocations/
+POST /api/v1/hostel/allocate/
+```
+
+**Allocate Room Request:**
+```json
+{
+  "student_id": 1,
+  "room_id": 1,
+  "allocation_date": "2025-09-17"
+}
+```
+
+## Library API
+
+### Books
+```http
+GET /api/v1/library/books/
+POST /api/v1/library/books/
+```
+
+### Borrow Records
+```http
+GET /api/v1/library/borrow-records/
+POST /api/v1/library/borrow-records/issue_book/
+POST /api/v1/library/borrow-records/<id>/return_book/
+```
+
+**Issue Book Request:**
+```json
+{
+  "book_id": 1,
+  "student_id": 1,
+  "due_date": "2025-10-17"
+}
+```
+
+## Notifications API
+
+### Notices
+```http
+GET /api/v1/notifications/notices/
+POST /api/v1/notifications/notices/
+```
+
+### User Notifications
+```http
+GET /api/v1/notifications/user-notifications/
+PATCH /api/v1/notifications/user-notifications/<id>/
+```
+
+**Mark as Read:**
+```json
+{
+  "is_read": true
+}
+```
+
+## Dashboard API
+
+### Statistics
+```http
+GET /api/v1/dashboard/stats/
+```
+
+### Role-specific Dashboards
+```http
+GET /api/v1/dashboard/student/<student_id>/
+GET /api/v1/dashboard/parent/<parent_id>/
+GET /api/v1/dashboard/faculty/<faculty_id>/
+GET /api/v1/dashboard/warden/
+GET /api/v1/dashboard/admin/
+```
+
+## Error Handling
+
+### Standard Error Response
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "timestamp": "2025-09-17T12:00:00Z",
+  "errors": [
+    "Detailed error message 1",
+    "Detailed error message 2"
+  ]
+}
+```
+
+### Common HTTP Status Codes
+- **200 OK**: Successful request
+- **201 Created**: Resource created successfully
+- **400 Bad Request**: Validation error or malformed request
+- **401 Unauthorized**: Authentication required or invalid token
+- **403 Forbidden**: Insufficient permissions
+- **404 Not Found**: Resource not found
+- **500 Internal Server Error**: Server error
+
+## Pagination Parameters
+- `page`: Page number (default: 1)
+- `page_size`: Items per page (default: 20, max: 100)
+
+**Example:**
+```http
+GET /api/v1/users/students/?page=2&page_size=50
+```
+
+## Authentication Fixes
+
+### JWT Token Blacklisting
+- **Issue**: RefreshToken blacklist error on logout
+- **Solution**: Added `rest_framework_simplejwt.token_blacklist` to INSTALLED_APPS
+- **Result**: Proper token blacklisting for security
+
+## File Upload Guidelines
+- **Supported formats**: PDF, JPG, PNG
+- **Maximum file size**: 5MB per file
+- **Documents are virus-scanned** before storage
+- **Files are served with proper security headers**
+
+## Rate Limiting
+- **Email OTP requests**: 2-minute cooldown between requests
+- **Login attempts**: Standard rate limiting to prevent brute force attacks
+- **API requests**: General rate limiting for API protection
       "email": "user@example.com",
       "first_name": "John",
       "last_name": "Doe",

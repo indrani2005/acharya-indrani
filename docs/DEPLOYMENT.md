@@ -1,52 +1,762 @@
-# Acharya ERP Deployment Guide# Acharya ERP Deployment Guide
+# Acharya ERP Deployment Guide
 
+## Overview
 
+This guide covers deployment of the Acharya Educational Resource Planning system in various environments, from development to production.
 
-## Overview## Overview
+## System Requirements
 
-Complete deployment guide for the Acharya Educational Resource Planning system, covering development setup, production deployment, and maintenance procedures.This guide covers deployment of the Acharya ERP system in various environments, from development to production.
-
-
-
-## System Requirements## System Requirements
-
-
-
-### Development Environment### Minimum Requirements
-
-- **Python**: 3.11+ (recommended 3.13)- **CPU**: 2 cores
-
-- **Node.js**: 18+ (recommended 20+)- **RAM**: 4GB
-
-- **Package Managers**: UV for Python, Bun for Node.js- **Storage**: 20GB SSD
-
-- **Database**: SQLite (included with Python)- **OS**: Ubuntu 20.04+ / CentOS 8+ / Windows Server 2019+
-
-- **Operating System**: Windows 10+, macOS 10.15+, or Ubuntu 20.04+
+### Minimum Requirements
+- **CPU**: 2 cores
+- **RAM**: 4GB
+- **Storage**: 20GB SSD
+- **OS**: Ubuntu 20.04+ / CentOS 8+ / Windows Server 2019+
 
 ### Recommended Requirements (Production)
+- **CPU**: 4 cores
+- **RAM**: 8GB
+- **Storage**: 50GB SSD
+- **OS**: Ubuntu 22.04 LTS
 
-### Production Environment- **CPU**: 4 cores
+## Development Environment Setup
 
-- **Server**: Linux (Ubuntu 22.04 LTS recommended)- **RAM**: 8GB
-
-- **Python**: 3.11+- **Storage**: 50GB SSD
-
-- **Database**: PostgreSQL 15+- **OS**: Ubuntu 22.04 LTS
-
-- **Web Server**: Nginx 1.18+
-
-- **Process Manager**: Systemd or Supervisor## Development Environment Setup
-
-- **SSL**: Let's Encrypt or commercial certificate
-
-- **Memory**: Minimum 2GB RAM (4GB+ recommended)### Backend Setup (Django)
-
-- **Storage**: Minimum 20GB (50GB+ recommended)
+### Backend Setup (Django)
 
 #### Prerequisites
+- Python 3.11+
+- UV package manager
+- Git
 
-## Development Setup- Python 3.11+
+#### Installation Steps
+
+1. **Clone the Repository**
+```bash
+git clone <repository-url>
+cd Acharya
+```
+
+2. **Install UV Package Manager**
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+3. **Navigate to Backend Directory**
+```bash
+cd backend
+```
+
+4. **Install Dependencies**
+```bash
+uv sync
+```
+
+5. **Environment Configuration**
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env file with your settings
+# DEBUG=True
+# SECRET_KEY=your-secret-key
+# DATABASE_URL=sqlite:///db.sqlite3
+```
+
+6. **Database Setup**
+```bash
+# Run migrations
+uv run python manage.py migrate
+
+# Create superuser
+uv run python manage.py createsuperuser
+
+# Load test data (optional)
+uv run python manage.py create_test_admin
+uv run python manage.py create_test_applications --count 5
+```
+
+7. **Start Development Server**
+```bash
+uv run python manage.py runserver
+```
+
+The backend API will be available at `http://localhost:8000/api/v1/`
+
+### Frontend Setup (React)
+
+#### Prerequisites
+- Node.js 18+
+- npm
+
+#### Installation Steps
+
+1. **Navigate to Frontend Directory**
+```bash
+cd frontend
+```
+
+2. **Install Dependencies**
+```bash
+npm install
+```
+
+3. **Environment Configuration**
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env file
+# VITE_API_BASE_URL=http://localhost:8000/api/v1/
+```
+
+4. **Start Development Server**
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173/`
+
+### Development URLs
+- **Frontend**: http://localhost:5173/
+- **Backend API**: http://localhost:8000/api/v1/
+- **Admin Panel**: http://localhost:8000/admin/
+- **API Documentation**: http://localhost:8000/api/docs/
+
+## Production Deployment
+
+### Backend Production Setup
+
+#### Server Preparation (Ubuntu 22.04)
+
+1. **Update System**
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+2. **Install System Dependencies**
+```bash
+sudo apt install python3.11 python3.11-venv python3-pip nginx postgresql postgresql-contrib redis-server git curl -y
+```
+
+3. **Install UV Package Manager**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.bashrc
+```
+
+4. **Create Application User**
+```bash
+sudo adduser acharya
+sudo usermod -aG sudo acharya
+su - acharya
+```
+
+#### Application Deployment
+
+1. **Clone Repository**
+```bash
+cd /home/acharya
+git clone <repository-url> acharya-app
+cd acharya-app/backend
+```
+
+2. **Install Dependencies**
+```bash
+uv sync --no-dev
+```
+
+3. **Environment Configuration**
+```bash
+# Create production environment file
+sudo nano /home/acharya/acharya-app/backend/.env
+```
+
+**Production .env file:**
+```env
+DEBUG=False
+SECRET_KEY=your-very-secure-secret-key
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com,127.0.0.1
+DATABASE_URL=postgresql://acharya_user:password@localhost:5432/acharya_db
+CORS_ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+
+# Email Configuration
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=noreply@your-domain.com
+
+# Frontend URL for emails
+FRONTEND_URL=https://your-domain.com
+```
+
+#### Database Setup (PostgreSQL)
+
+1. **Create Database and User**
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE DATABASE acharya_db;
+CREATE USER acharya_user WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE acharya_db TO acharya_user;
+ALTER USER acharya_user CREATEDB;
+\q
+```
+
+2. **Run Migrations**
+```bash
+cd /home/acharya/acharya-app/backend
+uv run python manage.py migrate
+uv run python manage.py collectstatic --noinput
+uv run python manage.py createsuperuser
+```
+
+#### Gunicorn Configuration
+
+1. **Create Gunicorn Configuration**
+```bash
+sudo nano /home/acharya/acharya-app/backend/gunicorn.conf.py
+```
+
+```python
+bind = "127.0.0.1:8000"
+workers = 3
+worker_class = "sync"
+worker_connections = 1000
+max_requests = 1000
+max_requests_jitter = 100
+preload_app = True
+keepalive = 5
+user = "acharya"
+group = "acharya"
+timeout = 30
+```
+
+2. **Create Systemd Service**
+```bash
+sudo nano /etc/systemd/system/acharya.service
+```
+
+```ini
+[Unit]
+Description=Acharya Django Application
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=acharya
+Group=acharya
+WorkingDirectory=/home/acharya/acharya-app/backend
+Environment=PATH=/home/acharya/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/acharya/.local/bin/uv run gunicorn config.wsgi:application -c gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. **Start and Enable Service**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable acharya
+sudo systemctl start acharya
+sudo systemctl status acharya
+```
+
+#### Nginx Configuration
+
+1. **Create Nginx Configuration**
+```bash
+sudo nano /etc/nginx/sites-available/acharya
+```
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com www.your-domain.com;
+    
+    # SSL Configuration
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    
+    # Static files
+    location /static/ {
+        alias /home/acharya/acharya-app/backend/staticfiles/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Media files
+    location /media/ {
+        alias /home/acharya/acharya-app/backend/media/;
+        expires 1y;
+        add_header Cache-Control "public";
+    }
+    
+    # API endpoints
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+    
+    # Admin panel
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Frontend (React app)
+    location / {
+        root /var/www/acharya-frontend;
+        try_files $uri $uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+}
+```
+
+2. **Enable Site**
+```bash
+sudo ln -s /etc/nginx/sites-available/acharya /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+#### SSL Certificate (Let's Encrypt)
+
+1. **Install Certbot**
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+```
+
+2. **Obtain Certificate**
+```bash
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+3. **Auto-renewal**
+```bash
+sudo crontab -e
+# Add: 0 12 * * * /usr/bin/certbot renew --quiet
+```
+
+### Frontend Production Setup
+
+#### Build and Deploy
+
+1. **Build Frontend**
+```bash
+cd /home/acharya/acharya-app/frontend
+
+# Update environment for production
+echo "VITE_API_BASE_URL=https://your-domain.com/api/v1/" > .env.production
+
+# Build for production
+npm run build
+```
+
+2. **Deploy to Web Directory**
+```bash
+sudo mkdir -p /var/www/acharya-frontend
+sudo cp -r dist/* /var/www/acharya-frontend/
+sudo chown -R www-data:www-data /var/www/acharya-frontend
+sudo chmod -R 755 /var/www/acharya-frontend
+```
+
+## Docker Deployment (Alternative)
+
+### Docker Compose Setup
+
+1. **Create docker-compose.yml**
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: acharya_db
+      POSTGRES_USER: acharya_user
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+  redis:
+    image: redis:7-alpine
+    
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://acharya_user:secure_password@postgres:5432/acharya_db
+    volumes:
+      - ./backend/media:/app/media
+      - ./backend/staticfiles:/app/staticfiles
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+      
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+```
+
+2. **Backend Dockerfile**
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV
+RUN pip install uv
+
+# Copy dependencies
+COPY pyproject.toml uv.lock ./
+
+# Install Python dependencies
+RUN uv sync --no-dev
+
+# Copy application
+COPY . .
+
+# Collect static files
+RUN uv run python manage.py collectstatic --noinput
+
+EXPOSE 8000
+
+CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+```
+
+3. **Frontend Dockerfile**
+```dockerfile
+FROM node:18-alpine as builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+## Environment Variables
+
+### Backend Environment Variables
+
+**Development (.env)**
+```env
+DEBUG=True
+SECRET_KEY=development-secret-key
+ALLOWED_HOSTS=localhost,127.0.0.1
+DATABASE_URL=sqlite:///db.sqlite3
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+FRONTEND_URL=http://localhost:5173
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+```
+
+**Production (.env)**
+```env
+DEBUG=False
+SECRET_KEY=your-very-secure-secret-key
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+DATABASE_URL=postgresql://user:pass@localhost:5432/acharya_db
+CORS_ALLOWED_ORIGINS=https://your-domain.com
+FRONTEND_URL=https://your-domain.com
+
+# Email Configuration
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=noreply@your-domain.com
+
+# Security
+SECURE_SSL_REDIRECT=True
+SECURE_HSTS_SECONDS=31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+SECURE_HSTS_PRELOAD=True
+```
+
+### Frontend Environment Variables
+
+**Development (.env)**
+```env
+VITE_API_BASE_URL=http://localhost:8000/api/v1/
+VITE_APP_NAME=Acharya School Management
+```
+
+**Production (.env.production)**
+```env
+VITE_API_BASE_URL=https://your-domain.com/api/v1/
+VITE_APP_NAME=Acharya School Management
+```
+
+## Database Management
+
+### Backup and Restore
+
+#### PostgreSQL Backup
+```bash
+# Create backup
+pg_dump -h localhost -U acharya_user -d acharya_db > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore backup
+psql -h localhost -U acharya_user -d acharya_db < backup_file.sql
+```
+
+#### SQLite Backup (Development)
+```bash
+# Create backup
+cp db.sqlite3 backup_$(date +%Y%m%d_%H%M%S).sqlite3
+```
+
+### Database Migrations
+
+```bash
+# Create migrations
+uv run python manage.py makemigrations
+
+# Apply migrations
+uv run python manage.py migrate
+
+# Check migration status
+uv run python manage.py showmigrations
+```
+
+## Monitoring and Logging
+
+### Application Logs
+
+**View Django Logs**
+```bash
+# View service logs
+sudo journalctl -u acharya -f
+
+# View Nginx logs
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Health Checks
+
+**Backend Health Check**
+```bash
+curl -f http://localhost:8000/api/v1/users/auth/me/ -H "Authorization: Bearer <token>"
+```
+
+**Database Health Check**
+```bash
+uv run python manage.py check --database default
+```
+
+## Performance Optimization
+
+### Database Optimization
+```sql
+-- Create indexes for better performance
+CREATE INDEX idx_admission_application_reference_id ON admissions_admissionapplication(reference_id);
+CREATE INDEX idx_admission_application_email ON admissions_admissionapplication(email);
+CREATE INDEX idx_school_decision_application ON admissions_schooladmissiondecision(application_id);
+```
+
+### Nginx Caching
+```nginx
+# Add to nginx configuration
+location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+```
+
+## Security Best Practices
+
+### Django Security Settings
+```python
+# In settings.py for production
+SECURE_SSL_REDIRECT = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+```
+
+### File Upload Security
+```python
+# File upload restrictions
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_FILE_TYPES = ['.pdf', '.jpg', '.jpeg', '.png']
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Backend Issues
+```bash
+# Check if service is running
+sudo systemctl status acharya
+
+# Check application logs
+sudo journalctl -u acharya -n 50
+
+# Check database connection
+uv run python manage.py dbshell
+```
+
+#### Frontend Issues
+```bash
+# Check Nginx configuration
+sudo nginx -t
+
+# Reload Nginx
+sudo systemctl reload nginx
+
+# Check frontend build
+npm run build
+```
+
+#### Permission Issues
+```bash
+# Fix file permissions
+sudo chown -R acharya:acharya /home/acharya/acharya-app/
+sudo chmod -R 755 /home/acharya/acharya-app/
+```
+
+### Performance Issues
+```bash
+# Check system resources
+htop
+df -h
+free -m
+
+# Check database performance
+EXPLAIN ANALYZE SELECT * FROM admissions_admissionapplication WHERE reference_id = 'ADM-2025-XXXXXX';
+```
+
+## Maintenance
+
+### Regular Maintenance Tasks
+
+1. **Update Dependencies**
+```bash
+# Backend
+cd backend
+uv sync --upgrade
+
+# Frontend
+cd frontend
+npm update
+```
+
+2. **Database Maintenance**
+```bash
+# Vacuum PostgreSQL
+sudo -u postgres psql acharya_db -c "VACUUM ANALYZE;"
+```
+
+3. **Log Rotation**
+```bash
+# Configure logrotate for application logs
+sudo nano /etc/logrotate.d/acharya
+```
+
+4. **Security Updates**
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+### Backup Strategy
+- **Daily**: Database backups
+- **Weekly**: Full application backups
+- **Monthly**: System backups
+- **Retention**: Keep 30 daily, 12 weekly, 12 monthly backups
+
+## Scaling Considerations
+
+### Horizontal Scaling
+- **Load Balancer**: Use Nginx or HAProxy for load balancing
+- **Multiple App Servers**: Deploy multiple Gunicorn instances
+- **Database Replication**: Set up PostgreSQL master-slave replication
+- **Redis Clustering**: Implement Redis cluster for session storage
+
+### Performance Monitoring
+- **Application Monitoring**: New Relic, DataDog, or Sentry
+- **Server Monitoring**: Prometheus + Grafana
+- **Database Monitoring**: pgAdmin or database-specific tools
+
+This deployment guide provides a comprehensive setup for both development and production environments, ensuring a robust and scalable deployment of the Acharya ERP system.
 
 - UV package manager
 

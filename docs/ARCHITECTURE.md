@@ -1,100 +1,330 @@
-# Acharya ERP System Architecture# Acharya ERP System Architecture
+# Acharya ERP System Architecture
 
+## Overview
 
+Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control, dynamic admissions management, and comprehensive fee structures.
 
-## Overview## Overview
+## System Architecture
 
-Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control, dynamic admissions management, and comprehensive fee structures.Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control.
+### Technology Stack
 
-
-
-## System Architecture## System Architecture
-
-
-
-### Technology Stack### Backend Architecture (Django + DRF)
-
-- **Backend**: Django 5.0+ with Django REST Framework- **Framework**: Django 5.0+ with Django REST Framework
-
-- **Frontend**: React 18+ with TypeScript, Vite, Tailwind CSS, shadcn/ui- **Database**: SQLite (development) / PostgreSQL (production)
-
-- **Database**: SQLite (development) / PostgreSQL (production) - **Authentication**: Token-based authentication
-
-- **Authentication**: JWT with token blacklisting- **API Design**: RESTful APIs with consistent response patterns
-
+**Backend Architecture (Django + DRF)**
+- **Framework**: Django 5.2+ with Django REST Framework
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **Authentication**: JWT with token blacklisting
 - **API Design**: RESTful APIs with consistent response patterns
+- **Package Management**: UV package manager
+- **API Documentation**: drf-spectacular with OpenAPI/Swagger
 
-- **Package Management**: UV (backend), Bun (frontend)### Frontend Architecture (React + TypeScript)
-
+**Frontend Architecture (React + TypeScript)**
 - **Framework**: React 18+ with TypeScript
-
-### Backend Architecture- **Build Tool**: Vite
-
+- **Build Tool**: Vite
 - **Styling**: Tailwind CSS + shadcn/ui components
-
-#### Core Applications- **State Management**: React Context + useState/useEffect
-
+- **State Management**: React Context + useState/useEffect
 - **API Client**: Axios with custom error handling
+- **Package Management**: npm
 
-1. **Users App** (`users/`)
+## Core Modules
 
-   - Custom user model with role-based authentication## Core Modules
+### 1. User Management (`users/`)
+- **Custom User Model**: Extended AbstractUser with role-based authentication
+- **User Roles**: Student, Parent, Faculty, Warden, Admin
+- **Profile Systems**:
+  - `StudentProfile`: Extended student information with school association
+  - `ParentProfile`: Parent information linked to students (no separate user account)
+  - `StaffProfile`: Faculty, warden, and admin profiles
+- **JWT Authentication**: Token-based authentication with refresh token rotation
+- **API Endpoints**: Login, logout, profile management, role-based access
 
-   - User roles: Student, Parent, Faculty, Warden, Admin
+### 2. School Management (`schools/`)
+- **Multi-School Support**: Centralized management of multiple schools
+- **School Model**: School information, codes, contact details
+- **User-School Association**: Users linked to specific schools
+- **School Statistics**: Dashboard data for each school
+- **API Endpoints**: School listing, statistics, dashboard data
 
-   - Profile management for different user types### 1. User Management (`users/`)
+### 3. Admissions (`admissions/`)
 
-   - JWT authentication with token blacklisting- User authentication and authorization
+**Comprehensive Admission System**
 
-- Role-based access control (Student, Parent, Faculty, Warden, Admin)
+#### Email Verification System
+- **OTP-based Verification**: Secure 6-digit OTP with 10-minute expiry
+- **Rate Limiting**: 2-minute cooldown between OTP requests
+- **Attempt Limiting**: Maximum 3 verification attempts per OTP
+- **Models**: `EmailVerification` with security controls
 
-2. **Schools App** (`schools/`)- Profile management for different user types
+#### Multi-School Application Process
+- **School Preferences**: Students can apply to up to 3 schools in preference order
+- **Application Model**: `AdmissionApplication` with comprehensive fields
+- **Document Support**: JSON-based document storage with upload capability
+- **Reference ID System**: Unique tracking IDs (format: ADM-YYYY-XXXXXX)
 
-   - Multi-school management system
+#### School Decision System
+- **Independent Review**: Each school reviews applications independently
+- **Decision Tracking**: `SchoolAdmissionDecision` model per school per application
+- **Decision States**: pending, under_review, accepted, rejected, waitlisted
+- **Enrollment Management**: Track enrollment status and dates
 
-   - School-specific configurations and data### 2. School Management (`config/`)
+#### Student Choice Workflow
+- **Multiple Acceptances**: Students can be accepted by multiple schools
+- **Student Choice**: Students choose their preferred school from acceptances
+- **Enrollment Control**: Single enrollment enforcement
+- **Withdrawal Support**: Students can withdraw and re-enroll elsewhere
 
-   - School user associations and permissions- Multi-school support
+#### Fee Integration System
+- **Category-based Fees**: Different fee structures by category (general, OBC, SC/ST)
+- **Class-wise Fees**: Fee calculation based on course and category
+- **Fee Models**: `FeeStructure` with regex-based course matching
+- **Payment Integration**: Linked to fee management system
 
-- School-specific configurations
+**API Endpoints:**
+- Email verification: `/verify-email/request/`, `/verify-email/verify/`
+- Applications: CRUD operations with school preferences
+- Tracking: Public tracking by reference ID
+- School review: School-specific application lists
+- Decision management: Accept/reject applications
+- Student choice: Choose from accepted schools
+- Enrollment: Enroll/withdraw from schools
+- Fee calculation: Calculate fees by course and category
 
-3. **Admissions App** (`admissions/`)- Centralized settings management
+### 4. Fee Management (`fees/`)
+- **Fee Structures**: Course and category-based fee calculation
+- **Invoice System**: Automated invoice generation
+- **Payment Processing**: Payment tracking and receipt generation
+- **Models**: `FeeStructure`, `FeeInvoice`, `Payment`
+- **API Endpoints**: Fee structures, invoices, payment processing
 
-   - **Email Verification System**: OTP-based email verification before application submission
+### 5. Attendance Management (`attendance/`)
+- **Class Sessions**: Session-based attendance tracking
+- **Attendance Records**: Individual student attendance records
+- **Bulk Operations**: Mark attendance for entire classes
+- **Models**: `ClassSession`, `AttendanceRecord`
+- **API Endpoints**: Session management, attendance marking, reporting
 
-   - **Multi-School Application**: Students can apply to up to 3 schools in preference order### 3. Admissions (`admissions/`)
+### 6. Examination System (`exams/`)
+- **Exam Management**: Create and manage examinations
+- **Result Processing**: Grade entry and result calculation
+- **Grade System**: Comprehensive grading with A+ to F scale
+- **Models**: `Exam`, `ExamResult`
+- **API Endpoints**: Exam CRUD, result entry, grade reporting
 
-   - **School Decision System**: Each school independently reviews and decides on applications- Online admission application system
+### 7. Hostel Management (`hostel/`)
+- **Room Management**: Hostel room allocation and tracking
+- **Student Allocation**: Room assignment and change requests
+- **Occupancy Tracking**: Room capacity and availability
+- **Models**: `HostelRoom`, `HostelAllocation`
+- **API Endpoints**: Room management, allocation, change requests
 
-   - **Student Choice Workflow**: Students can choose from multiple accepted schools- Email verification with OTP
+### 8. Library Management (`library/`)
+- **Book Catalog**: Complete book inventory management
+- **Borrowing System**: Book issue and return tracking
+- **Fine Management**: Overdue fine calculation
+- **Models**: `Book`, `BookBorrowRecord`
+- **API Endpoints**: Book management, borrowing operations
 
-   - **Enrollment Management**: Track enrollment status, enrollment/withdrawal dates- Multi-school preference system
+### 9. Notification System (`notifications/`)
+- **Notice Management**: School-wide announcements
+- **User Notifications**: Personalized notifications
+- **Read Status**: Track notification read status
+- **Models**: `Notice`, `UserNotification`
+- **API Endpoints**: Notice CRUD, notification management
 
-   - **Fee Integration**: Category-based fee calculation system- School-specific admission review
+### 10. Dashboard System (`dashboard/`)
+- **Role-based Dashboards**: Different dashboards per user role
+- **Statistics API**: Comprehensive statistics for each role
+- **Real-time Data**: Live dashboard updates
+- **API Endpoints**: Role-specific dashboard data, statistics
 
-   - **Document Upload**: Support for application documents- Student choice workflow for multiple acceptances
+## Database Schema
 
+### Core Models
 
+**User System**
+- `User` (Custom AbstractUser): Email-based authentication with roles
+- `StudentProfile`: Student-specific information
+- `ParentProfile`: Parent information (no separate user account)
+- `StaffProfile`: Staff member information
 
-   **Key Models:**#### Admission Workflow
+**School System**
+- `School`: School master data
+- User-School relationships through foreign keys
 
-   - `EmailVerification`: OTP management for email verification1. **Application Submission**
+**Admission System**
+- `EmailVerification`: OTP management for email verification
+- `AdmissionApplication`: Main application with school preferences
+- `SchoolAdmissionDecision`: School-specific decisions and enrollment tracking
+- `FeeStructure`: Class and category-based fee structures
 
-   - `AdmissionApplication`: Main application with school preferences   - Email verification required
+**Academic System**
+- `ClassSession`: Class session management
+- `AttendanceRecord`: Student attendance tracking
+- `Exam`: Examination management
+- `ExamResult`: Student exam results
 
-   - `SchoolAdmissionDecision`: School-specific decisions and enrollment tracking   - Support for 3 school preferences
+**Infrastructure**
+- `HostelRoom`: Hostel room management
+- `HostelAllocation`: Room allocation tracking
+- `Book`: Library book catalog
+- `BookBorrowRecord`: Book borrowing tracking
 
-   - `FeeStructure`: Class and category-based fee structures   - Document upload capability
+**Financial System**
+- `FeeInvoice`: Student fee invoices
+- `Payment`: Payment tracking
 
-   
+**Communication**
+- `Notice`: School notices
+- `UserNotification`: User-specific notifications
 
-4. **Students App** (`students/`)2. **School Review Process**
+## API Design
 
-   - Student profile management   - Each school reviews applications independently
+### RESTful Architecture
+- **Consistent Endpoints**: Standard REST patterns across all modules
+- **Standardized Responses**: Consistent JSON response format
+- **Error Handling**: Comprehensive error responses with proper HTTP status codes
+- **Pagination**: Standard pagination for list endpoints
 
-   - Academic records and course enrollment   - School-specific admission decisions
+### Authentication & Authorization
+- **JWT Authentication**: Access and refresh token system
+- **Token Blacklisting**: Secure logout with token invalidation
+- **Role-based Permissions**: Different access levels per user role
+- **School-based Filtering**: Data filtered by user's associated school
 
-   - Integration with admissions for enrolled students   - Status tracking per school
+### Response Format
+```json
+{
+  "success": true|false,
+  "data": {...},
+  "message": "Success/error message",
+  "timestamp": "ISO timestamp",
+  "errors": [...] // Only on validation errors
+}
+```
+
+## Frontend Architecture
+
+### Component Structure
+- **Page Components**: Role-based dashboard pages
+- **UI Components**: Reusable shadcn/ui components
+- **Layout Components**: Dashboard layouts and navigation
+- **Form Components**: React Hook Form with Zod validation
+
+### State Management
+- **React Context**: Authentication and global state
+- **React Query**: Server state management and caching
+- **Local State**: Component-level state with hooks
+
+### API Integration
+- **Axios Client**: Configured HTTP client with interceptors
+- **Service Layer**: Domain-specific API services
+- **Error Handling**: Global error handling and user feedback
+- **Authentication**: Automatic token management and refresh
+
+### Routing
+- **React Router**: Client-side routing with role-based guards
+- **Protected Routes**: Authentication and authorization checks
+- **Dynamic Routing**: Role-based dashboard routing
+
+## Security Implementation
+
+### Backend Security
+- **Input Validation**: Comprehensive form and API validation
+- **SQL Injection Protection**: Django ORM protection
+- **XSS Protection**: Input sanitization and output encoding
+- **CSRF Protection**: Django CSRF middleware
+- **Rate Limiting**: API rate limiting for sensitive endpoints
+
+### Authentication Security
+- **JWT Security**: Secure token generation and validation
+- **Password Security**: Django's built-in password validation
+- **Session Management**: Secure session handling
+- **Token Rotation**: Automatic refresh token rotation
+
+### Data Protection
+- **Role-based Access**: Strict permission controls
+- **School Data Isolation**: Users can only access their school's data
+- **Audit Logging**: Track important user actions
+- **File Upload Security**: Secure file handling and validation
+
+## System Fixes & Improvements
+
+### Enrollment System Fixes
+
+#### Admin Panel Status Display
+- **Issue**: Admin panel showing "Pending" instead of actual database status
+- **Solution**: Enhanced `SchoolAdmissionDecisionAdmin` with proper status display methods
+- **Implementation**:
+  - Added `get_decision_status()` with emoji indicators
+  - Improved `get_enrollment_display()` with clear status messages
+  - Added custom `save_model()` with validation and error handling
+
+#### Enrollment Logic Improvements
+- **Single Enrollment Enforcement**: Students can only be enrolled in one school at a time
+- **Withdrawal Support**: Students can withdraw and re-enroll elsewhere
+- **Re-enrollment Logic**: Enhanced `can_enroll()` logic to allow re-enrollment after withdrawal
+- **Admin Validation**: Prevents invalid state changes (e.g., rejecting enrolled students)
+
+#### Admin Detail View Fixes
+- **Issue**: Static "School Decisions" section showing incorrect status
+- **Solution**: Removed static display methods, kept dynamic inline display
+- **Result**: Admin shows real-time database status via `SchoolAdmissionDecisionInline`
+
+### Data Consistency & Validation
+- **Enrollment Status Tracking**: Proper date tracking for enrollment and withdrawal
+- **Multiple Enrollment Prevention**: Backend validation ensures single active enrollment
+- **Status Synchronization**: Real-time updates between frontend and backend
+- **Error Handling**: Clear validation messages for invalid operations
+
+### Test Infrastructure
+- **Test Organization**: All test files moved to `backend/test/` folder
+- **Test Coverage**: Enrollment logic, data consistency, application status validation
+- **Debug Tools**: Scripts for data cleanup and status verification
+
+## Deployment Architecture
+
+### Development Environment
+- **Backend**: Django development server on port 8000
+- **Frontend**: Vite development server on port 5173
+- **Database**: SQLite for rapid development
+- **Authentication**: JWT tokens with development settings
+
+### Production Considerations
+- **Database**: PostgreSQL for production reliability
+- **Static Files**: CDN distribution for static assets
+- **Security**: Production security settings and HTTPS
+- **Monitoring**: Application and database monitoring
+- **Scalability**: Load balancing and horizontal scaling
+
+## Performance Optimization
+
+### Database Optimization
+- **Indexes**: Strategic database indexing for performance
+- **Query Optimization**: Efficient ORM queries with select_related and prefetch_related
+- **Pagination**: Consistent pagination across all list endpoints
+
+### Frontend Optimization
+- **Code Splitting**: Route-based code splitting for optimal loading
+- **Caching**: React Query caching for server state
+- **Bundle Optimization**: Vite optimization for production builds
+
+### API Optimization
+- **Response Compression**: Gzip compression for API responses
+- **Caching Headers**: Appropriate cache headers for static content
+- **Connection Pooling**: Database connection optimization
+
+## Future Enhancements
+
+### Planned Features
+- **Real-time Notifications**: WebSocket integration for live updates
+- **Advanced Analytics**: Comprehensive reporting and analytics
+- **Mobile Application**: React Native mobile app
+- **Payment Gateway**: Integrated payment processing
+- **Multi-language Support**: Internationalization support
+
+### Technical Improvements
+- **Microservices**: Potential migration to microservices architecture
+- **Container Deployment**: Docker containerization
+- **CI/CD Pipeline**: Automated testing and deployment
+- **API Versioning**: Version management for API evolution
 
    
 

@@ -1,286 +1,245 @@
 # 🎓 Acharya Multi-School Management System
 
-A comprehensive multi-school management system built with Django REST Framework (Backend) and React + TypeScript (Frontend).
+A comprehensive multi-school management system designed for the Government of Rajasthan, built with Django REST Framework (Backend) and React + TypeScript (Frontend).
 
-## 🌟 Features
+## 🌟 System Overview
 
-### 🔐 Authentication & Authorization
-- JWT-based authentication
-- Role-based access control (Admin, Staff, Student, Parent)
-- Multi-school access management
-- OTP verification support
+The Acharya ERP system is a modern Educational Resource Planning platform that supports:
 
-### 📋 Admissions Management
-- **Online Admission Form** - Multi-step form with document upload
-- **Application Tracking** - Real-time status updates
-- **Review System** - Admin approval/rejection workflow
-- **Document Management** - Secure file upload and storage
-- **Public Access** - No authentication required for form submission
+### Core Features
+- **Multi-School Admission System**: Students apply to up to 3 schools with independent review and enrollment tracking
+- **Category-Based Fee Management**: Dynamic fee calculation based on class levels and categories (General, SC/ST/OBC/SBC)  
+- **Role-Based Access Control**: Separate interfaces for Students, Parents, Faculty, Admins, and Wardens
+- **Document Management**: Secure file upload, validation, and serving with proper authentication
+- **Real-Time Tracking**: Application status, enrollment updates, and notifications across the system
 
-### 🏫 School Management
-- Multi-school support
-- School-specific dashboards
-- Administrative controls
-- Performance metrics
+### Technology Stack
+- **Backend**: Django 5.2+, Django REST Framework, JWT authentication, PostgreSQL/SQLite
+- **Frontend**: React 18+, TypeScript, Vite, shadcn/ui components, Tailwind CSS, React Query
+- **Development Tools**: UV package manager, npm, Git, VS Code
+- **Production**: Ubuntu Linux, Nginx, Gunicorn, Let's Encrypt SSL, systemd services
 
-### 👥 User Management
-- Student, Staff, and Parent profiles
-- Role-based permissions
-- Account management
-- Profile customization
+## 📚 Documentation
 
-### 💰 Fee Management
-- Invoice generation
-- Payment tracking
-- Fee structure management
-- Financial reporting
+**Complete technical documentation is available in the `docs/` folder:**
 
-### 📊 Dashboard & Analytics
-- Real-time statistics
-- Performance metrics
-- Interactive charts
-- Export capabilities
+- **[📋 Architecture Guide](docs/ARCHITECTURE.md)** - System design, technical implementation, and feature details
+- **[🔌 API Reference](docs/API_REFERENCE.md)** - Complete API documentation with examples and authentication
+- **[🚀 Deployment Guide](docs/DEPLOYMENT.md)** - Development setup and production deployment instructions
 
-## � Documentation
-
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design, components, and data flow
-- **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete API reference and endpoints
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
-- **[Testing Guide](docs/TESTING.md)** - Testing strategies and implementation
-
-## �🚀 Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- UV package manager
-- PostgreSQL (or SQLite for development)
+- **Python 3.11+** (recommended 3.13)
+- **Node.js 18+** (recommended 20+)
+- **UV package manager** for Python dependencies
+- **PostgreSQL 15+** (production) or SQLite (development)
 
-### Backend Setup
+### Development Setup
 
-1. **Clone the repository**
+#### 1. Clone Repository
 ```bash
 git clone <repository-url>
-cd Acharya/backend
+cd Acharya
 ```
 
-2. **Install UV package manager**
+#### 2. Backend Setup (Django)
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+cd backend
 
-# Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+# Install UV package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
+# OR
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
 
-3. **Install dependencies**
-```bash
+# Install dependencies
 uv sync
-```
 
-4. **Environment setup**
-```bash
-# Copy environment file (create one if needed)
+# Environment configuration
 cp .env.example .env
-# Edit .env with your configuration
-```
+# Edit .env with your settings
 
-5. **Database setup**
-```bash
+# Database setup
 uv run python manage.py migrate
-uv run python manage.py create_test_admin
-uv run python manage.py create_test_applications --count 5
-```
+uv run python manage.py createsuperuser
 
-6. **Run development server**
-```bash
+# Start development server
 uv run python manage.py runserver
 ```
 
-The API will be available at `http://localhost:8000/api/v1/`
-
-### Frontend Setup
-
-1. **Navigate to frontend directory**
+#### 3. Frontend Setup (React)
 ```bash
-cd ../frontend
-```
+cd frontend
 
-2. **Install dependencies**
-```bash
+# Install dependencies
 npm install
-```
 
-3. **Create environment file**
-```bash
+# Environment configuration  
 cp .env.example .env
-# Edit .env with your configuration
-```
+# Edit .env with your settings
 
-4. **Start development server**
-```bash
+# Start development server
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173/`
+### Access Points
+- **Frontend**: http://localhost:5173/
+- **Backend API**: http://localhost:8000/api/v1/
+- **Admin Panel**: http://localhost:8000/admin/
 
-## 🔗 API Documentation
-
-### Base URLs
-- **Backend API**: `http://localhost:8000/api/v1/`
-- **Admin Panel**: `http://localhost:8000/admin/`
-- **API Docs**: `http://localhost:8000/api/docs/`
-
-### Key Endpoints
-
-#### 🎓 Admissions
-- `POST /api/v1/admissions/applications/` - Submit application (Public)
-- `GET /api/v1/admissions/applications/` - List applications (Admin)
-- `PATCH /api/v1/admissions/applications/{id}/review/` - Review application
-
-#### 🔐 Authentication
-- `POST /api/v1/users/auth/login/` - User login
-- `POST /api/v1/users/auth/logout/` - User logout
-- `POST /api/v1/users/auth/refresh/` - Refresh token
-
-#### 🏫 Schools
-- `GET /api/v1/schools/` - List schools
-- `GET /api/v1/schools/{id}/dashboard/` - School dashboard
-
-## 📁 Project Structure
+## 🏗️ Project Structure
 
 ```
 Acharya/
 ├── backend/                    # Django Backend
-│   ├── config/                # Django settings
-│   ├── admissions/            # Admissions app
-│   ├── users/                 # User management
-│   ├── schools/               # School management
-│   ├── fees/                  # Fee management
+│   ├── config/                # Django settings and URLs
+│   ├── users/                 # User management and authentication
+│   ├── admissions/            # Multi-school admission system
+│   ├── students/              # Student profiles and academic records
+│   ├── staff/                 # Faculty and staff management
+│   ├── fees/                  # Category-based fee management
 │   ├── attendance/            # Attendance tracking
-│   ├── exams/                 # Exam management
+│   ├── exams/                 # Examination management
 │   ├── hostel/                # Hostel management
 │   ├── library/               # Library management
 │   ├── notifications/         # Notification system
-│   └── requirements.txt       # Python dependencies
+│   ├── analytics/             # Analytics and reporting
+│   ├── reports/               # Report generation
+│   ├── parents/               # Parent portal features
+│   ├── test/                  # Testing scripts and data
+│   ├── manage.py              # Django management script
+│   └── pyproject.toml         # Python dependencies (UV)
 │
-├── frontend/                  # React Frontend
+├── frontend/                  # React + TypeScript Frontend
 │   ├── src/
-│   │   ├── components/        # Reusable components
-│   │   ├── pages/            # Page components
-│   │   ├── lib/              # Utilities and API
+│   │   ├── components/        # UI components (shadcn/ui)
+│   │   ├── pages/            # Route components
+│   │   ├── lib/              # Utilities and API clients
 │   │   ├── hooks/            # Custom React hooks
-│   │   └── integrations/     # External integrations
-│   ├── public/               # Static assets
-│   └── package.json          # Node dependencies
+│   │   ├── integrations/     # External service integrations
+│   │   └── assets/           # Static assets
+│   ├── public/               # Public static files
+│   ├── package.json          # Node.js dependencies
+│   └── vite.config.ts        # Vite configuration
 │
 └── docs/                     # Documentation
+    ├── ARCHITECTURE.md       # System design and implementation
+    ├── API_REFERENCE.md      # Complete API documentation
+    ├── DEPLOYMENT.md         # Setup and deployment guide
+    └── README.md             # Documentation overview
 ```
 
-## 🔧 Configuration
+## 🎯 Key Features
 
-### Environment Variables
+### Multi-School Admission Workflow
+1. **Email Verification**: OTP-based verification before application submission
+2. **School Preferences**: Students apply to up to 3 schools in preference order
+3. **Independent Review**: Each school reviews and decides on applications separately
+4. **Student Choice**: Students choose from multiple accepted schools
+5. **Enrollment Tracking**: Complete enrollment/withdrawal workflow with date tracking
 
-#### Backend (.env)
-```bash
-DEBUG=True
-SECRET_KEY=your-secret-key
-DATABASE_URL=postgresql://user:pass@localhost/dbname
-ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-```
+### Role-Based Dashboards
+- **Students**: Application status, enrollment details, fee information
+- **Parents**: Child's academic progress and school communications
+- **Faculty**: Student management, attendance, and academic records
+- **Admins**: System oversight, application review, and analytics
+- **Wardens**: Hostel management and student welfare
 
-#### Frontend (.env)
-```bash
-VITE_API_BASE_URL=http://localhost:8000/api/v1/
-VITE_APP_NAME=Acharya School Management
-```
+### Advanced Fee Management
+- **Dynamic Calculation**: Based on class levels (1-8, 9-10, 11-12) and categories
+- **Category Support**: General, SC/ST, OBC, SBC with different fee structures
+- **Real-time Display**: Immediate fee calculation in the frontend
+- **Payment Integration**: Secure payment workflow with tracking
 
-## 🎯 Admission Form Features
+## 🔐 Security Features
 
-### Multi-Step Form Process
-1. **Personal Details** - Name, DOB, contact information
-2. **Document Upload** - Required certificates and photos
-3. **Additional Information** - Previous school, academic records
-4. **Review & Submit** - Terms acceptance and final submission
-
-### Document Requirements
-- Birth Certificate
-- Previous School Report Card/Transfer Certificate
-- Passport Size Photograph
-- Address Proof (Aadhar/Utility Bill)
-- Caste Certificate (if applicable)
-
-### Supported File Formats
-- PDF, JPG, JPEG, PNG
-- Maximum 5MB per file
-- Multiple file uploads supported
-
-## 🔒 Security Features
-
-- **JWT Authentication** with refresh tokens
-- **CORS Protection** for cross-origin requests
-- **Input Validation** on all forms
-- **File Upload Security** with type and size restrictions
-- **Rate Limiting** on API endpoints
-- **SQL Injection Protection** via Django ORM
+- **JWT Authentication**: Secure token-based authentication with refresh tokens
+- **Role-Based Permissions**: Granular access control per endpoint and feature
+- **Input Validation**: Comprehensive validation on all forms and API endpoints
+- **File Upload Security**: Type and size restrictions with malware scanning
+- **CORS Protection**: Secure cross-origin resource sharing configuration
+- **Production Security**: SSL/TLS, security headers, and protection against common attacks
 
 ## 🧪 Testing
 
-For comprehensive testing information, see the [Testing Guide](docs/TESTING.md).
+**Test files are organized in `backend/test/` folder:**
 
-### Quick Test Commands
-
-#### Backend Tests
 ```bash
+# Backend testing
 cd backend
-uv run pytest
-```
+uv run python manage.py test
 
-#### Frontend Tests
-```bash
+# Frontend testing  
 cd frontend
 npm run test
+
+# End-to-end testing
+npm run test:e2e
 ```
 
-## 📊 Monitoring & Analytics
+## 📈 Production Deployment
 
-- Real-time application statistics
-- User activity tracking
-- Performance metrics
-- Error logging and monitoring
+For complete deployment instructions, see the **[Deployment Guide](docs/DEPLOYMENT.md)**.
+
+### Quick Production Overview
+- **Server**: Ubuntu 22.04+ with PostgreSQL and Nginx
+- **Security**: SSL certificates, firewall configuration, security headers
+- **Process Management**: Systemd services with auto-restart
+- **Performance**: Database optimization, static file caching, monitoring
+- **Backup**: Automated database and media file backups
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
-4. Push to the branch (`git push origin feature/new-feature`)
-5. Create a Pull Request
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/new-feature`)
+3. **Review** the [Architecture Guide](docs/ARCHITECTURE.md) for implementation patterns
+4. **Test** your changes thoroughly
+5. **Update** documentation as needed
+6. **Submit** a pull request with detailed description
 
-## 📄 License
+## 📞 Support
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Getting Help
+- **Development Issues**: Review [API Reference](docs/API_REFERENCE.md) and [Architecture Guide](docs/ARCHITECTURE.md)
+- **Deployment Issues**: Check [Deployment Guide](docs/DEPLOYMENT.md) troubleshooting sections
+- **System Questions**: Refer to specific documentation sections based on your role
 
-## 🆘 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the [API Documentation](docs/API_DOCUMENTATION.md)
-- Review the [Architecture Guide](docs/ARCHITECTURE.md)
-- See the [Deployment Guide](docs/DEPLOYMENT.md)
+### Issue Reporting
+- Create detailed bug reports with reproduction steps
+- Include system information and error logs
+- Reference relevant documentation sections
 
 ## 🗺️ Roadmap
 
-- [ ] Advanced reporting features
-- [ ] Mobile application
-- [ ] Integration with payment gateways
-- [ ] Advanced analytics dashboard
-- [ ] Multi-language support
-- [ ] SMS/Email notifications
-- [ ] Student portal enhancements
-- [ ] Parent portal features
+### Planned Features
+- **Advanced Analytics**: Enhanced reporting and dashboard features
+- **Mobile Application**: Native mobile app for students and parents
+- **Payment Gateway**: Integration with multiple payment providers
+- **Multi-Language Support**: Localization for Hindi and regional languages
+- **SMS/Email Notifications**: Automated communication system
+- **API Extensions**: Additional endpoints for third-party integrations
+
+### Technical Improvements
+- **Performance Optimization**: Caching strategies and database optimization
+- **Monitoring**: Enhanced logging and application performance monitoring
+- **Security Enhancements**: Additional security measures and compliance features
+- **Testing**: Expanded test coverage and automated testing pipelines
+
+## 📄 License
+
+This project is developed for the Government of Rajasthan and follows government software development guidelines.
+
+## 🏆 Acknowledgments
+
+Built with modern web technologies:
+- **Django & DRF** for robust backend architecture
+- **React & TypeScript** for type-safe frontend development
+- **shadcn/ui** for beautiful, accessible UI components
+- **UV Package Manager** for efficient Python dependency management
+- **Vite** for fast frontend development and building
 
 ---
 
-Built with ❤️ using Django REST Framework and React + TypeScript
+**For detailed technical information, implementation guides, and deployment instructions, please refer to the [comprehensive documentation](docs/) in the `docs/` folder.**
+
+*Last Updated: January 2025 | Version: 1.0.0 | Status: Production Ready ✅*
