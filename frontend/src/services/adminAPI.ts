@@ -87,7 +87,7 @@ export interface AdmissionApplication {
 export interface SchoolAdmissionDecision {
   id: number;
   school: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  decision: 'pending' | 'accepted' | 'rejected';
   review_date?: string;
   notes?: string;
 }
@@ -229,15 +229,31 @@ export const adminAPI = {
   },
 
   // Update admission decision
-  updateAdmissionDecision: async (decisionId: number, status: string, notes?: string) => {
+  updateAdmissionDecision: async (decisionId: number, decision: string, notes?: string) => {
     try {
       const response = await apiClient.patch(`/admissions/school-decision/${decisionId}/`, {
-        status,
-        notes
+        decision,  // Use 'decision' field to match backend model
+        review_comments: notes
       });
       return response.data;
     } catch (error) {
       console.error('Error updating admission decision:', error);
+      throw error;
+    }
+  },
+
+  // Create new admission decision
+  createAdmissionDecision: async (applicationId: number, schoolId: number, decision: string, notes?: string) => {
+    try {
+      const response = await apiClient.post('/admissions/school-decision/', {
+        application_id: applicationId,
+        school_id: schoolId,
+        decision,  // Use 'decision' field to match backend model
+        notes
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating admission decision:', error);
       throw error;
     }
   }

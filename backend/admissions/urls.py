@@ -10,9 +10,12 @@ urlpatterns = [
     path('verify-email/request/', views.EmailVerificationRequestAPIView.as_view(), name='request-email-verification'),
     path('verify-email/verify/', views.EmailVerificationAPIView.as_view(), name='verify-email'),
     path('school-review/', views.SchoolAdmissionReviewAPIView.as_view(), name='school-admission-review'),
+    path('school-decision/', views.SchoolDecisionCreateAPIView.as_view(), name='create-school-decision'),
     path('school-decision/<int:decision_id>/', views.SchoolDecisionUpdateAPIView.as_view(), name='update-school-decision'),
     path('student-choice/', views.StudentChoiceAPIView.as_view(), name='student-choice'),
     path('accepted-schools/', views.AcceptedSchoolsAPIView.as_view(), name='accepted-schools'),
+    path('fee-payment/init/', views.FeePaymentInitAPIView.as_view(), name='init-fee-payment'),
+    path('documents/<int:application_id>/', views.DocumentUploadAPIView.as_view(), name='upload-documents'),
     path('', include(router.urls)),
 ]
 

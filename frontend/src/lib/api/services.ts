@@ -23,7 +23,7 @@ import {
   DashboardStats,
   ApiResponse
 } from './types';
-import { api } from './client';
+import { api, apiClient } from './client';
 
 export const schoolService = {
   // Get list of active schools for admission forms (public)
@@ -43,6 +43,26 @@ export const admissionService = {
   // Submit admission application (requires email verification)
   submitApplication: (data: Partial<AdmissionApplication>): Promise<AdmissionApplication> =>
     api.post('admissions/applications/', data),
+
+  // Upload documents for an admission application
+  uploadDocuments: async (applicationId: number, files: File[]): Promise<any> => {
+    const formData = new FormData();
+    files.forEach((file, index) => {
+      formData.append(`document_${index + 1}`, file);
+    });
+    
+    const response = await apiClient.post(`admissions/documents/${applicationId}/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  },
+
+  // Get documents for an admission application
+  getDocuments: (applicationId: number): Promise<any> =>
+    api.get(`admissions/documents/${applicationId}/`),
 
   // Get all applications (admin)
   getApplications: (params?: any): Promise<ApiResponse<AdmissionApplication[]>> =>
@@ -67,6 +87,10 @@ export const admissionService = {
   // Submit student's school choice
   submitStudentChoice: (data: { reference_id: string; chosen_school: string }): Promise<ApiResponse<any>> =>
     api.post('admissions/student-choice/', data),
+
+  // Initialize fee payment process
+  initializeFeePayment: (data: { reference_id: string; school_decision_id?: number }): Promise<ApiResponse<any>> =>
+    api.post('admissions/fee-payment/init/', data),
 };
 
 export const feeService = {

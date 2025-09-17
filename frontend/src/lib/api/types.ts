@@ -9,6 +9,7 @@ export interface User {
   phone_number?: string;
   is_active: boolean;
   date_joined: string;
+  school?: School;
 }
 
 export interface School {
@@ -99,9 +100,9 @@ export interface AdmissionApplication {
   phone_number: string;
   address: string;
   course_applied: string;
-  first_preference_school?: School;
-  second_preference_school?: School;
-  third_preference_school?: School;
+  first_preference_school?: number | School; // Can accept both for flexibility
+  second_preference_school?: number | School;
+  third_preference_school?: number | School;
   previous_school?: string;
   last_percentage?: number;
   documents?: Record<string, string>;

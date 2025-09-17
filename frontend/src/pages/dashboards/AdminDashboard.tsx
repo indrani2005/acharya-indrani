@@ -81,6 +81,47 @@ export default function AdminDashboard() {
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
+  // Document viewing handler
+  const handleViewDocument = async (documentPath: string, documentName: string) => {
+    try {
+      // Create a download URL for the document
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const documentUrl = `${baseUrl}/media/${documentPath}`;
+      
+      // Open in new tab or download
+      window.open(documentUrl, '_blank');
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      // You might want to show a toast notification here
+    }
+  };
+
+  // Decision update handler
+  const handleDecisionUpdate = async (
+    applicationId: number, 
+    schoolId: number, 
+    decisionId: number | null, 
+    status: string, 
+    notes?: string
+  ) => {
+    try {
+      if (decisionId === null || decisionId === 0) {
+        // Need to create a new decision
+        await adminAPI.createAdmissionDecision(applicationId, schoolId, status, notes);
+      } else {
+        // Update existing decision
+        await adminAPI.updateAdmissionDecision(decisionId, status, notes);
+      }
+      
+      // Reload admissions data
+      const updatedAdmissions = await adminAPI.getSchoolAdmissions();
+      setAdmissionsData(updatedAdmissions);
+    } catch (error) {
+      console.error('Error updating admission decision:', error);
+      // You might want to show a toast notification here
+    }
+  };
+
   // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
@@ -613,24 +654,19 @@ export default function AdminDashboard() {
   const renderAdmissionsTab = () => {
     const filteredAdmissions = filterData(admissionsData, "admissions");
 
-    const handleDecisionUpdate = async (decisionId: number, status: string, notes?: string) => {
-      try {
-        await adminAPI.updateAdmissionDecision(decisionId, status, notes);
-        // Reload admissions data
-        const updatedAdmissions = await adminAPI.getSchoolAdmissions();
-        setAdmissionsData(updatedAdmissions);
-      } catch (error) {
-        console.error('Error updating admission decision:', error);
-        // You might want to show a toast notification here
-      }
-    };
-
     const getStatusBadge = (status: string) => {
-      switch (status) {
+      console.log('getStatusBadge called with status:', status, typeof status);
+      
+      if (!status) {
+        return <Badge variant="secondary">Pending</Badge>;
+      }
+      
+      const statusLower = status.toLowerCase();
+      switch (statusLower) {
         case 'pending':
           return <Badge variant="secondary">Pending</Badge>;
         case 'accepted':
-          return <Badge variant="default" className="bg-green-500">Accepted</Badge>;
+          return <Badge variant="default" className="bg-green-500 text-white">Accepted</Badge>;
         case 'rejected':
           return <Badge variant="destructive">Rejected</Badge>;
         default:
@@ -713,20 +749,30 @@ export default function AdminDashboard() {
                         const decisionSchoolId = typeof decision.school === 'object' 
                           ? decision.school.id 
                           : decision.school;
-                        const profileSchoolId = typeof profile?.school === 'object'
-                          ? profile.school.id
-                          : profile?.school;
+                        const userSchoolId = user?.school?.id;
                         
-                        return decisionSchoolId === profileSchoolId;
+                        console.log('Debug application:', {
+                          appId: application.id,
+                          appRef: application.reference_id,
+                          schoolDecisions: application.school_decisions,
+                          currentUserSchoolId: userSchoolId,
+                          decision,
+                          decisionSchoolId,
+                          matches: decisionSchoolId === userSchoolId
+                        });
+                        
+                        return decisionSchoolId === userSchoolId;
                       }
                     );
+                    
+                    console.log('Final schoolDecision for', application.reference_id, ':', schoolDecision);
                     
                     return (
                       <TableRow key={application.id}>
                         <TableCell className="font-medium">{application.reference_id}</TableCell>
-                        <TableCell>{application.full_name}</TableCell>
+                        <TableCell>{application.applicant_name}</TableCell>
                         <TableCell>{application.email}</TableCell>
-                        <TableCell>{application.phone}</TableCell>
+                        <TableCell>{application.phone_number}</TableCell>
                         <TableCell>
                           {application.date_of_birth 
                             ? new Date(application.date_of_birth).toLocaleDateString() 
@@ -734,11 +780,15 @@ export default function AdminDashboard() {
                           }
                         </TableCell>
                         <TableCell>
-                          {schoolDecision ? getStatusBadge(schoolDecision.status) : <Badge variant="secondary">Pending</Badge>}
+                          {schoolDecision ? (
+                            getStatusBadge(schoolDecision.decision || 'pending')
+                          ) : (
+                            <Badge variant="secondary">Pending</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
-                          {application.submitted_at 
-                            ? new Date(application.submitted_at).toLocaleDateString() 
+                          {application.application_date 
+                            ? new Date(application.application_date).toLocaleDateString() 
                             : 'Not submitted'
                           }
                         </TableCell>
@@ -755,43 +805,108 @@ export default function AdminDashboard() {
                               <Eye className="h-4 w-4 mr-1" />
                               View Details
                             </Button>
-                            {(!schoolDecision || schoolDecision.status === 'pending') && (
+                            
+                            {/* Show buttons based on current decision status */}
+                            {!schoolDecision ? (
+                              // No decision yet - show both Accept and Reject
                               <>
                                 <Button
                                   size="sm"
                                   variant="default"
                                   className="bg-green-500 hover:bg-green-600"
-                                  onClick={() => handleDecisionUpdate(
-                                    schoolDecision?.id || 0,
-                                    'accepted'
-                                  )}
+                                  onClick={() => {
+                                    handleDecisionUpdate(
+                                      application.id,
+                                      user?.school?.id || 0,
+                                      null,
+                                      'accepted'
+                                    );
+                                  }}
                                 >
                                   Accept
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => handleDecisionUpdate(
-                                    schoolDecision?.id || 0,
-                                    'rejected'
-                                  )}
+                                  onClick={() => {
+                                    handleDecisionUpdate(
+                                      application.id,
+                                      user?.school?.id || 0,
+                                      null,
+                                      'rejected'
+                                    );
+                                  }}
                                 >
                                   Reject
                                 </Button>
                               </>
-                            )}
-                            {schoolDecision && schoolDecision.status !== 'pending' && (
+                            ) : schoolDecision.decision === 'pending' ? (
+                              // Pending decision - show both Accept and Reject
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-green-500 hover:bg-green-600"
+                                  onClick={() => {
+                                    handleDecisionUpdate(
+                                      application.id,
+                                      user?.school?.id || 0,
+                                      schoolDecision.id,
+                                      'accepted'
+                                    );
+                                  }}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    handleDecisionUpdate(
+                                      application.id,
+                                      user?.school?.id || 0,
+                                      schoolDecision.id,
+                                      'rejected'
+                                    );
+                                  }}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            ) : schoolDecision.decision === 'accepted' ? (
+                              // Already accepted - show only Reject option
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => handleDecisionUpdate(
-                                  schoolDecision.id,
-                                  'pending'
-                                )}
+                                variant="destructive"
+                                onClick={() => {
+                                  handleDecisionUpdate(
+                                    application.id,
+                                    user?.school?.id || 0,
+                                    schoolDecision.id,
+                                    'rejected'
+                                  );
+                                }}
                               >
-                                Reset
+                                Change to Reject
                               </Button>
-                            )}
+                            ) : schoolDecision.decision === 'rejected' ? (
+                              // Already rejected - show only Accept option
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-500 hover:bg-green-600"
+                                onClick={() => {
+                                  handleDecisionUpdate(
+                                    application.id,
+                                    user?.school?.id || 0,
+                                    schoolDecision.id,
+                                    'accepted'
+                                  );
+                                }}
+                              >
+                                Change to Accept
+                              </Button>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -868,7 +983,7 @@ export default function AdminDashboard() {
       
       {/* Application Details Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
             <DialogDescription>
@@ -877,151 +992,290 @@ export default function AdminDashboard() {
           </DialogHeader>
           
           {selectedApplication && (
-            <div className="space-y-6">
-              {/* Personal Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Personal Information</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="font-semibold">Full Name</Label>
-                    <p>{selectedApplication.applicant_name}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Email</Label>
-                    <p>{selectedApplication.email}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Phone Number</Label>
-                    <p>{selectedApplication.phone_number}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Date of Birth</Label>
-                    <p>{selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Address</Label>
-                    <p>{selectedApplication.address}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Course Applied</Label>
-                    <p>{selectedApplication.course_applied}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Previous School</Label>
-                    <p>{selectedApplication.previous_school}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Last Percentage</Label>
-                    <p>{selectedApplication.last_percentage}%</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="space-y-4">
+              {/* Quick Actions Bar */}
+              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedApplication.applicant_name}</h3>
+                  <p className="text-sm text-gray-600">Reference: {selectedApplication.reference_id}</p>
+                </div>
+                <div className="flex gap-2">
+                  {(() => {
+                    const schoolDecision = selectedApplication.school_decisions?.find(
+                      decision => {
+                        const decisionSchoolId = typeof decision.school === 'object' 
+                          ? decision.school.id 
+                          : decision.school;
+                        return decisionSchoolId === user?.school?.id;
+                      }
+                    );
+                    
+                    if (!schoolDecision || schoolDecision.decision === 'pending') {
+                      // No decision or pending - show Accept and Reject
+                      return (
+                        <>
+                          <Button
+                            variant="default"
+                            size="lg"
+                            className="bg-green-500 hover:bg-green-600 text-white"
+                            onClick={() => {
+                              handleDecisionUpdate(
+                                selectedApplication.id,
+                                user?.school?.id || 0,
+                                schoolDecision?.id || null,
+                                'accepted'
+                              );
+                              setShowDetailsModal(false);
+                            }}
+                          >
+                            <CheckCircle className="h-5 w-5 mr-2" />
+                            Accept Application
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="lg"
+                            onClick={() => {
+                              handleDecisionUpdate(
+                                selectedApplication.id,
+                                user?.school?.id || 0,
+                                schoolDecision?.id || null,
+                                'rejected'
+                              );
+                              setShowDetailsModal(false);
+                            }}
+                          >
+                            <AlertCircle className="h-5 w-5 mr-2" />
+                            Reject Application
+                          </Button>
+                        </>
+                      );
+                    } else if (schoolDecision.decision === 'accepted') {
+                      // Already accepted - show status and option to reject
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" className="bg-green-500 text-white text-base px-3 py-1">
+                            ✅ ACCEPTED
+                          </Badge>
+                          <Button
+                            variant="destructive"
+                            size="lg"
+                            onClick={() => {
+                              handleDecisionUpdate(
+                                selectedApplication.id,
+                                user?.school?.id || 0,
+                                schoolDecision.id,
+                                'rejected'
+                              );
+                              setShowDetailsModal(false);
+                            }}
+                          >
+                            <AlertCircle className="h-5 w-5 mr-2" />
+                            Change to Reject
+                          </Button>
+                        </div>
+                      );
+                    } else if (schoolDecision.decision === 'rejected') {
+                      // Already rejected - show status and option to accept
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="text-base px-3 py-1">
+                            ❌ REJECTED
+                          </Badge>
+                          <Button
+                            variant="default"
+                            size="lg"
+                            className="bg-green-500 hover:bg-green-600 text-white"
+                            onClick={() => {
+                              handleDecisionUpdate(
+                                selectedApplication.id,
+                                user?.school?.id || 0,
+                                schoolDecision.id,
+                                'accepted'
+                              );
+                              setShowDetailsModal(false);
+                            }}
+                          >
+                            <CheckCircle className="h-5 w-5 mr-2" />
+                            Change to Accept
+                          </Button>
+                        </div>
+                      );
+                    } else {
+                      // Unknown status
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">
+                            Status: {schoolDecision.decision || 'Unknown'}
+                          </Badge>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
 
-              {/* School Preferences */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>School Preferences</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label className="font-semibold">First Preference</Label>
-                    <p>{selectedApplication.first_preference_school?.school_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Second Preference</Label>
-                    <p>{selectedApplication.second_preference_school?.school_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Third Preference</Label>
-                    <p>{selectedApplication.third_preference_school?.school_name || 'Not specified'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Compact Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Personal Information */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Personal Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Email</Label>
+                      <p>{selectedApplication.email}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Phone</Label>
+                      <p>{selectedApplication.phone_number}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Date of Birth</Label>
+                      <p>{selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Address</Label>
+                      <p className="text-xs">{selectedApplication.address}</p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Application Status */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Application Status</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="font-semibold">Reference ID</Label>
-                    <p>{selectedApplication.reference_id}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Application Date</Label>
-                    <p>{selectedApplication.application_date ? new Date(selectedApplication.application_date).toLocaleDateString() : 'Not available'}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Overall Status</Label>
-                    <Badge variant={selectedApplication.status === 'approved' || selectedApplication.status === 'accepted' ? 'default' : 'secondary'}>
-                      {selectedApplication.status?.charAt(0).toUpperCase() + selectedApplication.status?.slice(1)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Review Comments</Label>
-                    <p>{selectedApplication.review_comments || 'No comments yet'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+                {/* Academic Information */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Academic Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Course Applied</Label>
+                      <p>{selectedApplication.course_applied}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Previous School</Label>
+                      <p>{selectedApplication.previous_school}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Last Percentage</Label>
+                      <p>{selectedApplication.last_percentage}%</p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Documents */}
+                {/* School Preferences */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">School Preferences</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">1st Choice</Label>
+                      <p>{selectedApplication.first_preference_school?.school_name || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">2nd Choice</Label>
+                      <p>{selectedApplication.second_preference_school?.school_name || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">3rd Choice</Label>
+                      <p>{selectedApplication.third_preference_school?.school_name || 'Not specified'}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Documents Section */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Uploaded Documents</CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Uploaded Documents</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {selectedApplication.documents && Object.keys(selectedApplication.documents).length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3">
-                      {Object.entries(selectedApplication.documents).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between p-3 border rounded">
-                          <div>
-                            <Label className="font-semibold">{key.replace(/_/g, ' ').toUpperCase()}</Label>
-                            <p className="text-sm text-gray-600">{value as string}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Object.entries(selectedApplication.documents).map(([key, value]) => {
+                        // Extract filename from path
+                        const fullPath = value as string;
+                        const filename = fullPath.split('/').pop() || fullPath;
+                        const documentNumber = key.replace(/_/g, ' ').toUpperCase();
+                        
+                        return (
+                          <div key={key} className="flex items-center justify-between p-2 border rounded text-sm">
+                            <div>
+                              <Label className="font-medium text-xs">{documentNumber}</Label>
+                              <p className="text-xs text-gray-600 truncate">{filename}</p>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewDocument(fullPath, key)}
+                              className="h-8 px-2"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
                           </div>
-                          <Button size="sm" variant="outline">
-                            <FileText className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <p className="text-gray-500">No documents uploaded</p>
+                    <p className="text-gray-500 text-sm">No documents uploaded</p>
                   )}
                 </CardContent>
               </Card>
 
-              {/* School Decisions */}
-              {selectedApplication.school_decisions && selectedApplication.school_decisions.length > 0 && (
+              {/* Application Status and School Decisions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>School Decision Status</CardTitle>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Application Status</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedApplication.school_decisions.map((decision, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded">
-                          <div>
-                            <Label className="font-semibold">
-                              {typeof decision.school === 'object' && decision.school ? (decision.school as any).school_name : decision.school}
-                            </Label>
-                            <p className="text-sm text-gray-600">Preference: {decision.preference_order}</p>
-                            {decision.review_comments && (
-                              <p className="text-sm text-gray-600">Comments: {decision.review_comments}</p>
-                            )}
-                          </div>
-                          <Badge variant={decision.status === 'accepted' ? 'default' : decision.status === 'rejected' ? 'destructive' : 'secondary'}>
-                            {(decision.status || 'pending')?.charAt(0).toUpperCase() + (decision.status || 'pending')?.slice(1)}
-                          </Badge>
-                        </div>
-                      ))}
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Application Date</Label>
+                      <p>{selectedApplication.application_date ? new Date(selectedApplication.application_date).toLocaleDateString() : 'Not available'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Overall Status</Label>
+                      <Badge variant={selectedApplication.status === 'approved' || selectedApplication.status === 'accepted' ? 'default' : 'secondary'}>
+                        {selectedApplication.status?.charAt(0).toUpperCase() + selectedApplication.status?.slice(1)}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="font-medium text-xs text-gray-500">Review Comments</Label>
+                      <p className="text-xs">{selectedApplication.review_comments || 'No comments yet'}</p>
                     </div>
                   </CardContent>
                 </Card>
-              )}
+
+                {/* School Decisions */}
+                {selectedApplication.school_decisions && selectedApplication.school_decisions.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">School Decisions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {selectedApplication.school_decisions.map((decision, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 border rounded text-sm">
+                            <div>
+                              <Label className="font-medium text-xs">
+                                {typeof decision.school === 'object' && decision.school ? (decision.school as any).school_name : decision.school}
+                              </Label>
+                              <p className="text-xs text-gray-600">Preference: {decision.preference_order}</p>
+                              {decision.review_comments && (
+                                <p className="text-xs text-gray-600">Comments: {decision.review_comments}</p>
+                              )}
+                            </div>
+                            <Badge variant={decision.status === 'accepted' ? 'default' : decision.status === 'rejected' ? 'destructive' : 'secondary'}>
+                              {(decision.status || 'pending')?.charAt(0).toUpperCase() + (decision.status || 'pending')?.slice(1)}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

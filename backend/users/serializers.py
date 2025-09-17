@@ -6,14 +6,24 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
     date_joined = serializers.DateTimeField(source='created_at', read_only=True)
     full_name = serializers.SerializerMethodField()
+    school = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'role', 'phone_number', 'is_active', 'date_joined']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'role', 'phone_number', 'is_active', 'date_joined', 'school']
         read_only_fields = ['id', 'date_joined']
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
+    
+    def get_school(self, obj):
+        if obj.school:
+            return {
+                'id': obj.school.id,
+                'school_name': obj.school.school_name,
+                'school_code': obj.school.school_code
+            }
+        return None
 
 
 class LoginSerializer(serializers.Serializer):

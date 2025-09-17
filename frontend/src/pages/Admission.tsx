@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -389,20 +389,19 @@ const Admission = () => {
   }, [step, formData, isEmailVerified]);
 
   const uploadDocuments = async (applicationId: number, documents: File[]): Promise<void> => {
-    // This would upload documents to your file storage
-    // For now, we'll simulate this process
-    const documentPaths: Record<string, string> = {};
+    if (documents.length === 0) return;
     
-    for (let i = 0; i < documents.length; i++) {
-      const file = documents[i];
-      // In a real implementation, you would upload to cloud storage
-      // and get back the URL/path
-      documentPaths[`document_${i + 1}`] = `uploads/${applicationId}/${file.name}`;
+    try {
+      const result = await admissionService.uploadDocuments(applicationId, documents);
+      console.log('Documents uploaded successfully:', result);
+    } catch (error) {
+      console.error('Error uploading documents:', error);
+      toast({
+        title: "Document Upload Warning",
+        description: "Some documents failed to upload, but your application was submitted successfully.",
+        variant: "destructive",
+      });
     }
-
-    // For now, we'll just log the document paths
-    // In a real implementation, you would update the application
-    console.log('Document paths:', documentPaths);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -546,162 +545,16 @@ const Admission = () => {
             </CardDescription>
             
             {/* Track Application Button */}
-            <Dialog open={showTrackingModal} onOpenChange={setShowTrackingModal}>
-              <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="absolute top-4 right-4 bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Track Application
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Track Your Application</DialogTitle>
-                  <DialogDescription>
-                    Enter your reference ID to check your application status
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tracking-id">Reference ID</Label>
-                    <Input
-                      id="tracking-id"
-                      placeholder="Enter your reference ID (e.g., ADM-2025-A1B2C3)"
-                      value={trackingId}
-                      onChange={(e) => setTrackingId(e.target.value)}
-                    />
-                  </div>
-                  
-                  <Button 
-                    onClick={handleTrackApplication} 
-                    disabled={isTracking}
-                    className="w-full"
-                  >
-                    {isTracking ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Tracking...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4" />
-                        Track Application
-                      </>
-                    )}
-                  </Button>
-
-                  {trackingResult && trackingResult.success && trackingResult.data && (
-                    <div className="mt-4 p-4 border rounded-lg bg-muted/20">
-                      <h4 className="font-semibold mb-2">Application Status</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Reference ID:</span>
-                          <span className="font-mono">{trackingResult.data.reference_id}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Applicant:</span>
-                          <span>{trackingResult.data.applicant_name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Course:</span>
-                          <span>{trackingResult.data.course_applied}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Overall Status:</span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(trackingResult.data.status)}`}>
-                            {trackingResult.data.status.replace('_', ' ').toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Applied:</span>
-                          <span>{new Date(trackingResult.data.application_date).toLocaleDateString()}</span>
-                        </div>
-                        
-                        {/* School Preferences */}
-                        {trackingResult.data.first_preference_school && (
-                          <div className="flex justify-between">
-                            <span>1st Preference:</span>
-                            <span>{trackingResult.data.first_preference_school.school_name}</span>
-                          </div>
-                        )}
-                        {trackingResult.data.second_preference_school && (
-                          <div className="flex justify-between">
-                            <span>2nd Preference:</span>
-                            <span>{trackingResult.data.second_preference_school.school_name}</span>
-                          </div>
-                        )}
-                        {trackingResult.data.third_preference_school && (
-                          <div className="flex justify-between">
-                            <span>3rd Preference:</span>
-                            <span>{trackingResult.data.third_preference_school.school_name}</span>
-                          </div>
-                        )}
-
-                        {/* School Decisions */}
-                        {trackingResult.data.school_decisions && trackingResult.data.school_decisions.length > 0 && (
-                          <div className="mt-4 pt-4 border-t">
-                            <h5 className="font-medium mb-2">School Review Status</h5>
-                            <div className="space-y-2">
-                              {trackingResult.data.school_decisions.map((decision, index) => (
-                                <div key={index} className="flex justify-between items-center">
-                                  <span>{getSchoolName(decision.school, decision.school_name)}</span>
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                    decision.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                    decision.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {decision.status ? decision.status.toUpperCase() : 'PENDING'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Student Choice Interface */}
-                        {acceptedSchools.length > 1 && (
-                          <div className="mt-4 pt-4 border-t">
-                            <h5 className="font-medium mb-2 text-green-700">🎉 Multiple Acceptances!</h5>
-                            <p className="text-sm text-muted-foreground mb-3">
-                              Congratulations! You've been accepted to multiple schools. Please choose which school you'd like to attend:
-                            </p>
-                            <div className="space-y-2">
-                              {acceptedSchools.map((school, index) => (
-                                <Button
-                                  key={index}
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full justify-start"
-                                  onClick={() => handleStudentChoice(getSchoolName(school.school))}
-                                  disabled={isSubmittingChoice}
-                                >
-                                  {isSubmittingChoice ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                  )}
-                                  Choose {getSchoolName(school.school, school.school_name)}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {trackingResult.data.review_comments && (
-                          <div className="mt-2">
-                            <span className="font-medium">Comments:</span>
-                            <p className="text-muted-foreground mt-1">{trackingResult.data.review_comments}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Link to="/track">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="absolute top-4 right-4 bg-white/10 border-white/20 text-white hover:bg-white/20"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Track Application
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="p-6">
             {/* Step Progress */}
