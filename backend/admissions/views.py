@@ -692,10 +692,10 @@ class EnrollmentAPIView(APIView):
             # Check if student can enroll
             if not decision.can_enroll():
                 # Check specific reasons for inability to enroll
-                if decision.decision != 'accepted':
+                if decision.decision not in ['accepted', 'pending']:
                     return Response({
                         'success': False,
-                        'message': 'Cannot enroll: Application not accepted'
+                        'message': f'Cannot enroll: Application {decision.decision}'
                     }, status=status.HTTP_400_BAD_REQUEST)
                 elif decision.enrollment_status != 'not_enrolled':
                     return Response({

@@ -299,6 +299,12 @@ class SchoolAdmissionDecision(models.Model):
         self.enrollment_date = timezone.now()
         self.is_student_choice = True
         self.student_choice_date = timezone.now()
+        
+        # If decision is not already accepted, set it to accepted when enrolling
+        if self.decision != 'accepted':
+            self.decision = 'accepted'
+            self.decision_date = timezone.now()
+        
         if payment_reference:
             self.payment_reference = payment_reference
             self.payment_status = 'completed'
@@ -313,8 +319,9 @@ class SchoolAdmissionDecision(models.Model):
         self.save()
     
     def can_enroll(self):
-        """Check if student can enroll (decision is accepted and not already enrolled)"""
-        if self.decision != 'accepted':
+        """Check if student can enroll (decision is accepted or pending, and not already enrolled)"""
+        # Allow enrollment if decision is accepted OR pending (auto-accept on enrollment)
+        if self.decision not in ['accepted', 'pending']:
             return False
         
         if self.enrollment_status == 'enrolled':
@@ -384,6 +391,8 @@ class FeeStructure(models.Model):
     @classmethod
     def get_fee_for_student(cls, course_applied, category):
         """Calculate fee for a student based on their course and category"""
+        import re
+        
         # Map course to class range
         class_mapping = {
             '1': '1-8', '2': '1-8', '3': '1-8', '4': '1-8', 
@@ -392,12 +401,24 @@ class FeeStructure(models.Model):
             '11': '11-12', '12': '11-12'
         }
         
-        # Extract class number from course_applied
+        # Extract class number from course_applied using regex
         class_number = None
-        for key in class_mapping.keys():
-            if key in course_applied.lower():
-                class_number = key
-                break
+        course_lower = course_applied.lower()
+        
+        # Look for patterns like "class-12", "class 12", "12", "12th", etc.
+        # Try to match 2-digit numbers first (11, 12), then single digits
+        patterns = [
+            r'(?:class[-\s]?)?(\d{2})(?:th|st|nd|rd)?',  # Matches "class-12", "12th", etc.
+            r'(?:class[-\s]?)?(\d{1})(?:th|st|nd|rd)?'   # Matches "class-9", "9th", etc.
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, course_lower)
+            if match:
+                potential_class = match.group(1)
+                if potential_class in class_mapping:
+                    class_number = potential_class
+                    break
         
         if not class_number:
             return None

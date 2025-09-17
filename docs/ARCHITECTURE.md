@@ -1,248 +1,492 @@
-# Acharya ERP System Architecture
+# Acharya ERP System Architecture# Acharya ERP System Architecture
 
-## Overview
-Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control.
 
-## System Architecture
 
-### Backend Architecture (Django + DRF)
-- **Framework**: Django 5.0+ with Django REST Framework
-- **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: Token-based authentication
+## Overview## Overview
+
+Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control, dynamic admissions management, and comprehensive fee structures.Acharya is a comprehensive Educational Resource Planning (ERP) system designed for multi-school management in Rajasthan. The system supports administrative functions across multiple educational institutions with role-based access control.
+
+
+
+## System Architecture## System Architecture
+
+
+
+### Technology Stack### Backend Architecture (Django + DRF)
+
+- **Backend**: Django 5.0+ with Django REST Framework- **Framework**: Django 5.0+ with Django REST Framework
+
+- **Frontend**: React 18+ with TypeScript, Vite, Tailwind CSS, shadcn/ui- **Database**: SQLite (development) / PostgreSQL (production)
+
+- **Database**: SQLite (development) / PostgreSQL (production) - **Authentication**: Token-based authentication
+
+- **Authentication**: JWT with token blacklisting- **API Design**: RESTful APIs with consistent response patterns
+
 - **API Design**: RESTful APIs with consistent response patterns
 
-### Frontend Architecture (React + TypeScript)
+- **Package Management**: UV (backend), Bun (frontend)### Frontend Architecture (React + TypeScript)
+
 - **Framework**: React 18+ with TypeScript
-- **Build Tool**: Vite
+
+### Backend Architecture- **Build Tool**: Vite
+
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **State Management**: React Context + useState/useEffect
+
+#### Core Applications- **State Management**: React Context + useState/useEffect
+
 - **API Client**: Axios with custom error handling
 
-## Core Modules
+1. **Users App** (`users/`)
 
-### 1. User Management (`users/`)
-- User authentication and authorization
+   - Custom user model with role-based authentication## Core Modules
+
+   - User roles: Student, Parent, Faculty, Warden, Admin
+
+   - Profile management for different user types### 1. User Management (`users/`)
+
+   - JWT authentication with token blacklisting- User authentication and authorization
+
 - Role-based access control (Student, Parent, Faculty, Warden, Admin)
-- Profile management for different user types
 
-### 2. School Management (`config/`)
-- Multi-school support
+2. **Schools App** (`schools/`)- Profile management for different user types
+
+   - Multi-school management system
+
+   - School-specific configurations and data### 2. School Management (`config/`)
+
+   - School user associations and permissions- Multi-school support
+
 - School-specific configurations
-- Centralized settings management
 
-### 3. Admissions (`admissions/`)
-- Online admission application system
-- Email verification with OTP
-- Multi-school preference system
-- School-specific admission review
-- Student choice workflow for multiple acceptances
+3. **Admissions App** (`admissions/`)- Centralized settings management
 
-#### Admission Workflow
-1. **Application Submission**
-   - Email verification required
-   - Support for 3 school preferences
-   - Document upload capability
+   - **Email Verification System**: OTP-based email verification before application submission
+
+   - **Multi-School Application**: Students can apply to up to 3 schools in preference order### 3. Admissions (`admissions/`)
+
+   - **School Decision System**: Each school independently reviews and decides on applications- Online admission application system
+
+   - **Student Choice Workflow**: Students can choose from multiple accepted schools- Email verification with OTP
+
+   - **Enrollment Management**: Track enrollment status, enrollment/withdrawal dates- Multi-school preference system
+
+   - **Fee Integration**: Category-based fee calculation system- School-specific admission review
+
+   - **Document Upload**: Support for application documents- Student choice workflow for multiple acceptances
+
+
+
+   **Key Models:**#### Admission Workflow
+
+   - `EmailVerification`: OTP management for email verification1. **Application Submission**
+
+   - `AdmissionApplication`: Main application with school preferences   - Email verification required
+
+   - `SchoolAdmissionDecision`: School-specific decisions and enrollment tracking   - Support for 3 school preferences
+
+   - `FeeStructure`: Class and category-based fee structures   - Document upload capability
+
    
-2. **School Review Process**
-   - Each school reviews applications independently
-   - School-specific admission decisions
-   - Status tracking per school
+
+4. **Students App** (`students/`)2. **School Review Process**
+
+   - Student profile management   - Each school reviews applications independently
+
+   - Academic records and course enrollment   - School-specific admission decisions
+
+   - Integration with admissions for enrolled students   - Status tracking per school
+
    
-3. **Multi-School Acceptance**
-   - Students can be accepted by multiple schools
-   - Choice interface for final school selection
+
+5. **Staff/Faculty Apps** (`staff/`, `parents/`)3. **Multi-School Acceptance**
+
+   - Role-specific profile management   - Students can be accepted by multiple schools
+
+   - Extended user information and relationships   - Choice interface for final school selection
+
    - Automatic notification system
 
-### 4. Student Management (`students/`)
-- Student profiles and academic records
-- Course and batch management
-- Academic progress tracking
+6. **Academic Management** (`fees/`, `attendance/`, `exams/`, `library/`, `hostel/`)
 
-### 5. Staff Management (`staff/`)
+   - Comprehensive academic and administrative modules### 4. Student Management (`students/`)
+
+   - Each with REST APIs and admin interfaces- Student profiles and academic records
+
+- Course and batch management
+
+7. **System Apps** (`notifications/`, `reports/`, `analytics/`, `dashboard/`)- Academic progress tracking
+
+   - System-wide utilities and reporting
+
+   - Dashboard endpoints for role-specific views### 5. Staff Management (`staff/`)
+
 - Faculty profiles and qualifications
-- Department management
+
+#### Database Schema- Department management
+
 - Teaching assignments
 
-### 6. Fee Management (`fees/`)
-- Fee structure configuration
-- Payment processing
-- Invoice generation and tracking
+**Core Tables:**
 
-### 7. Attendance System (`attendance/`)
-- Daily attendance tracking
+- `users_user`: Custom user model with role field### 6. Fee Management (`fees/`)
+
+- `schools_school`: School information and configuration- Fee structure configuration
+
+- `admissions_emailverification`: Email OTP verification- Payment processing
+
+- `admissions_admissionapplication`: Student applications- Invoice generation and tracking
+
+- `admissions_schooladmissiondecision`: School-specific decisions and enrollment
+
+- `admissions_feestructure`: Class and category-based fees### 7. Attendance System (`attendance/`)
+
+- `students_student`: Student profiles and academic data- Daily attendance tracking
+
 - Attendance reports
-- Integration with academic calendar
 
-### 8. Examination System (`exams/`)
-- Exam scheduling
-- Result management
+**Key Relationships:**- Integration with academic calendar
+
+- User → Profile (Student/Staff/Parent) - One-to-One
+
+- School → Applications - One-to-Many (via preferences)### 8. Examination System (`exams/`)
+
+- Application → School Decisions - One-to-Many- Exam scheduling
+
+- Application → Email Verification - Foreign Key- Result management
+
 - Grade calculation
 
+#### API Architecture
+
 ### 9. Hostel Management (`hostel/`)
-- Room allocation
-- Hostel fee management
-- Warden oversight
+
+**Authentication:**- Room allocation
+
+- JWT tokens with access/refresh pattern- Hostel fee management
+
+- Token blacklisting for secure logout- Warden oversight
+
+- Role-based permissions per endpoint
 
 ### 10. Library Management (`library/`)
-- Book catalog
-- Issue/return tracking
-- Fine management
 
-### 11. Notifications (`notifications/`)
-- System-wide notification system
-- Email and in-app notifications
-- Role-based message targeting
+**Admission API Endpoints:**- Book catalog
 
-### 12. Analytics & Reports (`analytics/`, `reports/`)
-- Dashboard analytics
+```- Issue/return tracking
+
+POST /api/admissions/verify-email/request/    # Request OTP- Fine management
+
+POST /api/admissions/verify-email/verify/     # Verify OTP
+
+POST /api/admissions/submit/                  # Submit application### 11. Notifications (`notifications/`)
+
+GET /api/admissions/track/{ref_id}/           # Track application- System-wide notification system
+
+POST /api/admissions/student-choice/          # Submit school choice- Email and in-app notifications
+
+POST /api/admissions/enroll/                  # Enroll student- Role-based message targeting
+
+POST /api/admissions/withdraw/                # Withdraw enrollment
+
+POST /api/admissions/fee-calculation/         # Calculate fees### 12. Analytics & Reports (`analytics/`, `reports/`)
+
+```- Dashboard analytics
+
 - Custom report generation
-- Data visualization
 
-## Database Schema
+**Admin API Endpoints:**- Data visualization
 
-### Key Models
+```
 
-#### User & Authentication
+GET /api/dashboard/admin/                     # Admin dashboard data## Database Schema
+
+GET /api/admissions/school-admissions/        # School's applications
+
+POST /api/admissions/decisions/               # Create admission decision### Key Models
+
+PUT /api/admissions/decisions/{id}/           # Update admission decision
+
+```#### User & Authentication
+
 - `User` (Django's built-in user model extended)
-- `StudentProfile`, `ParentProfile`, `StaffProfile`, etc.
 
-#### Admissions
-- `AdmissionApplication` - Main application data
-- `SchoolAdmissionDecision` - School-specific admission decisions
-- Relationship: One application can have multiple school decisions
+### Frontend Architecture- `StudentProfile`, `ParentProfile`, `StaffProfile`, etc.
 
-#### Academic Management
-- `School` - Multi-school support
-- `Course`, `Department`, `Batch`
-- `FeeStructure`, `FeeInvoice`, `Payment`
 
-## API Endpoints
 
-### Authentication
-- `POST /api/auth/login/` - User login
-- `POST /api/auth/logout/` - User logout
+#### Component Structure#### Admissions
+
+```- `AdmissionApplication` - Main application data
+
+src/- `SchoolAdmissionDecision` - School-specific admission decisions
+
+├── components/          # Reusable UI components- Relationship: One application can have multiple school decisions
+
+│   ├── ui/             # shadcn/ui components
+
+│   └── ...             # Custom components#### Academic Management
+
+├── pages/              # Route components- `School` - Multi-school support
+
+│   ├── dashboards/     # Role-specific dashboards- `Course`, `Department`, `Batch`
+
+│   ├── Admission.tsx   # Admission form- `FeeStructure`, `FeeInvoice`, `Payment`
+
+│   └── TrackingPage.tsx # Application tracking
+
+├── services/           # API service layers## API Endpoints
+
+├── contexts/           # React contexts (Auth)
+
+├── lib/               # Utilities and helpers### Authentication
+
+└── styles/            # Global styles- `POST /api/auth/login/` - User login
+
+```- `POST /api/auth/logout/` - User logout
+
 - `GET /api/auth/user/` - Get current user
 
+#### Key Features
+
 ### Admissions
-- `POST /api/v1/admissions/verify-email/request/` - Request email OTP
-- `POST /api/v1/admissions/verify-email/verify/` - Verify email OTP
-- `POST /api/v1/admissions/applications/` - Submit application
-- `GET /api/v1/admissions/track/` - Track application status
-- `GET /api/v1/admissions/school-review/` - Get applications for school review
+
+1. **Multi-Role Dashboard System**- `POST /api/v1/admissions/verify-email/request/` - Request email OTP
+
+   - `AdminDashboard.tsx`: Comprehensive school management- `POST /api/v1/admissions/verify-email/verify/` - Verify email OTP
+
+   - `StudentDashboard.tsx`: Student portal- `POST /api/v1/admissions/applications/` - Submit application
+
+   - `ParentDashboard.tsx`: Parent portal- `GET /api/v1/admissions/track/` - Track application status
+
+   - Role-based sidebar and content- `GET /api/v1/admissions/school-review/` - Get applications for school review
+
 - `PATCH /api/v1/admissions/school-decision/<id>/` - Update school decision
-- `GET /api/v1/admissions/accepted-schools/` - Get accepted schools for student
-- `POST /api/v1/admissions/student-choice/` - Submit student's final choice
 
-### School Management
-- `GET /api/schools/public/` - Get active schools (public)
+2. **Admission System**- `GET /api/v1/admissions/accepted-schools/` - Get accepted schools for student
+
+   - `Admission.tsx`: Multi-step application form with email verification- `POST /api/v1/admissions/student-choice/` - Submit student's final choice
+
+   - `TrackingPage.tsx`: Real-time application status tracking
+
+   - Document upload and validation### School Management
+
+   - Dynamic fee calculation display- `GET /api/schools/public/` - Get active schools (public)
+
 - `GET /api/schools/stats/` - Get school statistics
-- `GET /api/schools/dashboard/` - Get dashboard data
 
-## Security Features
+3. **Admin Management**- `GET /api/schools/dashboard/` - Get dashboard data
 
-### Authentication & Authorization
+   - Application review and decision making
+
+   - Bulk operations for admissions## Security Features
+
+   - Real-time status updates
+
+   - Enrollment management### Authentication & Authorization
+
 - Token-based authentication
-- Role-based access control (RBAC)
-- Permission-based endpoint protection
 
-### Data Protection
+#### State Management- Role-based access control (RBAC)
+
+- React Context for authentication state- Permission-based endpoint protection
+
+- Local state with hooks for component data
+
+- API service layer for backend communication### Data Protection
+
 - Email verification for admissions
-- Secure file upload handling
-- SQL injection prevention
-- XSS protection
 
-### API Security
-- CORS configuration
-- Rate limiting (configurable)
-- Input validation and sanitization
+### Key Features Implementation- Secure file upload handling
+
+- SQL injection prevention
+
+#### 1. Multi-School Admission Workflow- XSS protection
+
+
+
+**Phase 1: Application Submission**### API Security
+
+1. Email verification with OTP (10-minute expiry)- CORS configuration
+
+2. Multi-step form with document upload- Rate limiting (configurable)
+
+3. School preference selection (1st, 2nd, 3rd choice)- Input validation and sanitization
+
+4. Automatic reference ID generation (ADM-YYYY-XXXXXX)
 
 ## Deployment Architecture
 
-### Development Environment
-- Django development server
-- Vite development server
-- SQLite database
+**Phase 2: School Review**
+
+1. Each school independently reviews applications### Development Environment
+
+2. School-specific admission decisions (Pending/Accepted/Rejected)- Django development server
+
+3. Admin dashboard for bulk review operations- Vite development server
+
+4. Notification system for decision updates- SQLite database
+
 - Local file storage
 
-### Production Environment (Recommended)
-- **Backend**: Gunicorn + Nginx
-- **Frontend**: Static files served by Nginx
-- **Database**: PostgreSQL
-- **File Storage**: AWS S3 or local with backup
+**Phase 3: Student Choice & Enrollment**
+
+1. Students track application status in real-time### Production Environment (Recommended)
+
+2. Choice submission for accepted schools- **Backend**: Gunicorn + Nginx
+
+3. Fee calculation based on class and category- **Frontend**: Static files served by Nginx
+
+4. Enrollment confirmation with payment integration- **Database**: PostgreSQL
+
+5. Withdrawal system with date tracking- **File Storage**: AWS S3 or local with backup
+
 - **Monitoring**: Django logging + error tracking
+
+#### 2. Category-Based Fee System
 
 ## Configuration Management
 
-### Environment Variables
-```bash
-# Database
-DATABASE_URL=postgresql://user:pass@localhost/dbname
+**Fee Structure:**
 
-# Email Configuration
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=your-email@gmail.com
+- Class ranges: 1-8, 9-10, 11-12### Environment Variables
+
+- Categories: General, SC/ST/OBC/SBC```bash
+
+- Flexible fee ranges (min-max) or fixed amounts# Database
+
+- Dynamic calculation based on course and categoryDATABASE_URL=postgresql://user:pass@localhost/dbname
+
+
+
+**Implementation:**# Email Configuration
+
+- `FeeStructure.get_fee_for_student()` method with regex-based course parsingEMAIL_HOST=smtp.gmail.com
+
+- API endpoint for real-time fee calculationEMAIL_PORT=587
+
+- Frontend integration with enrollment workflowEMAIL_HOST_USER=your-email@gmail.com
+
 EMAIL_HOST_PASSWORD=your-app-password
-EMAIL_USE_TLS=True
+
+#### 3. Real-Time Status DisplayEMAIL_USE_TLS=True
+
 DEFAULT_FROM_EMAIL=noreply@acharya-erp.com
 
-# Django Settings
-SECRET_KEY=your-secret-key
-DEBUG=False
-ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+**Status Types:**
+
+- Application status: Pending, Under Review, Approved, Rejected# Django Settings
+
+- Decision status per school: Pending, Accepted, RejectedSECRET_KEY=your-secret-key
+
+- Enrollment status: Not Enrolled, Enrolled, WithdrawnDEBUG=False
+
+- Overall status: Dynamically calculated from all school decisionsALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+
 ```
 
-### Settings Structure
-- `settings.py` - Base settings
-- Environment-specific overrides via `.env`
+**Frontend Implementation:**
+
+- Dynamic badge components with color coding### Settings Structure
+
+- Status aggregation logic for multiple school decisions- `settings.py` - Base settings
+
+- Real-time updates without page refresh- Environment-specific overrides via `.env`
+
 - Separate settings for development/production
+
+### Security Model
 
 ## Development Guidelines
 
-### Code Organization
-- Model-View-Serializer pattern for API endpoints
-- Service layer for complex business logic
-- Consistent error handling and response formats
+1. **Authentication**: JWT tokens with short-lived access tokens
 
-### API Design Principles
+2. **Authorization**: Role-based permissions at API level### Code Organization
+
+3. **Data Protection**: Input validation and sanitization- Model-View-Serializer pattern for API endpoints
+
+4. **File Upload Security**: Restricted file types and size limits- Service layer for complex business logic
+
+5. **CORS Configuration**: Frontend-backend communication security- Consistent error handling and response formats
+
+
+
+### Performance Considerations### API Design Principles
+
 - RESTful resource naming
-- Consistent response structure
-- Proper HTTP status codes
-- Comprehensive error messages
 
-### Frontend Architecture
+1. **Database Optimization**: Proper indexing on reference IDs and foreign keys- Consistent response structure
+
+2. **API Pagination**: Default 20 items per page for large datasets- Proper HTTP status codes
+
+3. **File Management**: Efficient document storage and retrieval- Comprehensive error messages
+
+4. **Frontend Optimization**: Code splitting and lazy loading
+
+5. **Caching Strategy**: Token caching and API response optimization### Frontend Architecture
+
 - Component-based architecture
-- Custom hooks for API integration
-- Centralized error handling
-- TypeScript for type safety
 
-## Testing Strategy
+### Deployment Architecture- Custom hooks for API integration
+
+- Centralized error handling
+
+**Development:**- TypeScript for type safety
+
+- SQLite database for local development
+
+- Django development server## Testing Strategy
+
+- Vite dev server for frontend
 
 ### Backend Testing
-- Unit tests for models and business logic
-- API endpoint testing
-- Integration tests for complex workflows
 
-### Frontend Testing
+**Production:**- Unit tests for models and business logic
+
+- PostgreSQL database with proper indexing- API endpoint testing
+
+- Nginx reverse proxy with SSL- Integration tests for complex workflows
+
+- Static file serving
+
+- Environment-based configuration### Frontend Testing
+
 - Component unit tests
-- Integration tests for user workflows
+
+### Monitoring & Maintenance- Integration tests for user workflows
+
 - E2E testing for critical paths
 
-## Performance Considerations
+1. **Logging**: Comprehensive logging for admissions and user actions
 
-### Database Optimization
-- Proper indexing on frequently queried fields
+2. **Error Handling**: Consistent error response format## Performance Considerations
+
+3. **Backup Strategy**: Database and document backup procedures
+
+4. **Health Checks**: API endpoint monitoring### Database Optimization
+
+5. **Performance Monitoring**: Database query optimization- Proper indexing on frequently queried fields
+
 - Query optimization for dashboard views
-- Connection pooling for production
 
-### Frontend Optimization
-- Code splitting for large applications
-- Lazy loading of non-critical components
-- Efficient state management
+### Recent Enhancements- Connection pooling for production
 
-### Caching Strategy
+
+
+1. **Fixed Fee Calculation**: Improved regex-based course parsing for accurate fee mapping### Frontend Optimization
+
+2. **Enhanced Status Display**: Comprehensive status aggregation across multiple schools- Code splitting for large applications
+
+3. **Enrollment Management**: Complete enrollment/withdrawal workflow- Lazy loading of non-critical components
+
+4. **Admin Dashboard**: Dynamic admissions management with real-time updates- Efficient state management
+
+5. **Document Handling**: Secure file upload and viewing system
+
+6. **Email Integration**: OTP verification and notification system### Caching Strategy
+
 - Redis for session and API caching (production)
-- Browser caching for static assets
+
+This architecture supports the complete lifecycle of multi-school admissions with robust state management, security, and scalability considerations.- Browser caching for static assets
 - Database query caching
 
 ## Monitoring & Maintenance
@@ -289,3 +533,37 @@ ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
 - Feature guides
 - FAQ and troubleshooting
 - Video tutorials
+
+## System Fixes & Improvements
+
+### Enrollment System Fixes
+
+#### Admin Panel Status Display
+- **Issue**: Admin panel showing "Pending" instead of actual database status
+- **Solution**: Enhanced `SchoolAdmissionDecisionAdmin` with proper status display methods
+- **Implementation**:
+  - Added `get_decision_status()` with emoji indicators
+  - Improved `get_enrollment_display()` with clear status messages
+  - Added custom `save_model()` with validation and error handling
+
+#### Enrollment Logic Improvements
+- **Single Enrollment Enforcement**: Students can only be enrolled in one school at a time
+- **Withdrawal Support**: Students can withdraw and re-enroll elsewhere
+- **Re-enrollment Logic**: Enhanced `can_enroll()` logic to allow re-enrollment after withdrawal
+- **Admin Validation**: Prevents invalid state changes (e.g., rejecting enrolled students)
+
+#### Admin Detail View Fixes
+- **Issue**: Static "School Decisions" section showing incorrect status
+- **Solution**: Removed static display methods, kept dynamic inline display
+- **Result**: Admin shows real-time database status via `SchoolAdmissionDecisionInline`
+
+### Data Consistency & Validation
+- **Enrollment Status Tracking**: Proper date tracking for enrollment and withdrawal
+- **Multiple Enrollment Prevention**: Backend validation ensures single active enrollment
+- **Status Synchronization**: Real-time updates between frontend and backend
+- **Error Handling**: Clear validation messages for invalid operations
+
+### Test Infrastructure
+- **Test Organization**: All test files moved to `backend/test/` folder
+- **Test Coverage**: Enrollment logic, data consistency, application status validation
+- **Debug Tools**: Scripts for data cleanup and status verification

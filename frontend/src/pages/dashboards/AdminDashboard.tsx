@@ -34,7 +34,8 @@ import {
   FileX,
   AlertTriangle,
   Loader2,
-  Eye
+  Eye,
+  UserX
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
@@ -78,6 +79,9 @@ export default function AdminDashboard() {
   const [feesData, setFeesData] = useState<any[]>([]);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [examsData, setExamsData] = useState<any[]>([]);
+  
+  // Unified dashboard data from /dashboard/admin/ endpoint
+  const [unifiedDashboardData, setUnifiedDashboardData] = useState<any>(null);
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
@@ -171,6 +175,21 @@ export default function AdminDashboard() {
     };
 
     loadData();
+  }, []);
+
+  // Load unified dashboard data specifically for admissions management
+  useEffect(() => {
+    const loadUnifiedDashboard = async () => {
+      try {
+        const unifiedData = await adminAPI.getAdminDashboardData();
+        setUnifiedDashboardData(unifiedData);
+        console.log('Unified dashboard data loaded:', unifiedData);
+      } catch (err) {
+        console.error('Failed to load unified dashboard data:', err);
+      }
+    };
+
+    loadUnifiedDashboard();
   }, []);
 
   const sidebarItems = [
@@ -281,6 +300,61 @@ export default function AdminDashboard() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  // Enhanced overall status for modal
+  const getOverallApplicationStatus = (application: any) => {
+    // Check if student is enrolled anywhere
+    const enrolledDecision = application.school_decisions?.find(
+      (decision: any) => decision.enrollment_status === 'enrolled'
+    );
+    
+    if (enrolledDecision) {
+      const schoolName = typeof enrolledDecision.school === 'object' 
+        ? enrolledDecision.school.school_name 
+        : 'Unknown School';
+      return {
+        status: 'Enrolled',
+        variant: 'default' as const,
+        className: 'bg-blue-600 text-white',
+        details: `Enrolled at ${schoolName}`
+      };
+    }
+    
+    // Check if student has any acceptances
+    const acceptedDecisions = application.school_decisions?.filter(
+      (decision: any) => decision.decision === 'accepted'
+    ) || [];
+    
+    if (acceptedDecisions.length > 0) {
+      return {
+        status: 'Accepted',
+        variant: 'default' as const,
+        className: 'bg-green-500 text-white',
+        details: `Accepted by ${acceptedDecisions.length} school(s)`
+      };
+    }
+    
+    // Check if all decisions are rejected
+    const rejectedDecisions = application.school_decisions?.filter(
+      (decision: any) => decision.decision === 'rejected'
+    ) || [];
+    
+    if (rejectedDecisions.length > 0 && rejectedDecisions.length === application.school_decisions?.length) {
+      return {
+        status: 'Rejected',
+        variant: 'destructive' as const,
+        className: '',
+        details: 'Rejected by all schools'
+      };
+    }
+    
+    return {
+      status: 'Pending',
+      variant: 'secondary' as const,
+      className: '',
+      details: 'Under review'
+    };
   };
 
   // Loading state
@@ -652,11 +726,28 @@ export default function AdminDashboard() {
   );
 
   const renderAdmissionsTab = () => {
+    // Use unified dashboard data if available, fallback to old data
+    const dashboardData = unifiedDashboardData;
     const filteredAdmissions = filterData(admissionsData, "admissions");
 
-    const getStatusBadge = (status: string) => {
-      console.log('getStatusBadge called with status:', status, typeof status);
+    const getEnrollmentBadge = (enrollmentStatus: string) => {
+      if (!enrollmentStatus) {
+        return <Badge variant="secondary">Not Enrolled</Badge>;
+      }
       
+      switch (enrollmentStatus.toUpperCase()) {
+        case 'ENROLLED':
+          return <Badge variant="default" className="bg-green-500 text-white">Enrolled</Badge>;
+        case 'WITHDRAWN':
+          return <Badge variant="destructive">Withdrawn</Badge>;
+        case 'NOT_ENROLLED':
+          return <Badge variant="secondary">Not Enrolled</Badge>;
+        default:
+          return <Badge variant="outline">{enrollmentStatus}</Badge>;
+      }
+    };
+
+    const getStatusBadge = (status: string) => {
       if (!status) {
         return <Badge variant="secondary">Pending</Badge>;
       }
@@ -665,6 +756,7 @@ export default function AdminDashboard() {
       switch (statusLower) {
         case 'pending':
           return <Badge variant="secondary">Pending</Badge>;
+        case 'approved':
         case 'accepted':
           return <Badge variant="default" className="bg-green-500 text-white">Accepted</Badge>;
         case 'rejected':
@@ -674,10 +766,105 @@ export default function AdminDashboard() {
       }
     };
 
+    // Enhanced status badge that considers enrollment status
+    const getEnhancedStatusBadge = (application: any, currentUserSchoolId?: number) => {
+      // Check if student is enrolled in any school
+      const enrolledDecision = application.school_decisions?.find(
+        (decision: any) => decision.enrollment_status === 'enrolled'
+      );
+      
+      if (enrolledDecision) {
+        const enrolledSchoolId = typeof enrolledDecision.school === 'object' 
+          ? enrolledDecision.school.id 
+          : enrolledDecision.school;
+          
+        if (enrolledSchoolId === currentUserSchoolId) {
+          // Student is enrolled in current user's school
+          return <Badge variant="default" className="bg-blue-600 text-white">Enrolled</Badge>;
+        } else {
+          // Student is enrolled in a different school - make it look disabled
+          const schoolName = typeof enrolledDecision.school === 'object' 
+            ? enrolledDecision.school.school_name 
+            : 'Another School';
+          return <Badge variant="secondary" className="bg-gray-100 text-gray-500 border-gray-300 opacity-75">Enrolled Elsewhere</Badge>;
+        }
+      }
+      
+      // No enrollment - check decision for current school
+      const schoolDecision = application.school_decisions?.find(
+        (decision: any) => {
+          const decisionSchoolId = typeof decision.school === 'object' 
+            ? decision.school.id 
+            : decision.school;
+          return decisionSchoolId === currentUserSchoolId;
+        }
+      );
+      
+      if (schoolDecision) {
+        return getStatusBadge(schoolDecision.decision || 'pending');
+      }
+      
+      return <Badge variant="secondary">Pending</Badge>;
+    };
+
     return (
       <div className="space-y-6">
+        {/* Statistics Cards */}
+        {dashboardData && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Total Applications
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardData.applications?.total || 0}</div>
+                <p className="text-xs text-muted-foreground">all time</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+                  <Clock className="h-4 w-4 mr-2" />
+                  Pending Reviews
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{dashboardData.applications?.pending || 0}</div>
+                <p className="text-xs text-muted-foreground">need attention</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Enrolled Students
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{dashboardData.enrollment?.enrolled || 0}</div>
+                <p className="text-xs text-muted-foreground">currently enrolled</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+                  <UserX className="h-4 w-4 mr-2" />
+                  Withdrawn
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{dashboardData.enrollment?.withdrawn || 0}</div>
+                <p className="text-xs text-muted-foreground">withdrew enrollment</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Review Admissions</h2>
+          <h2 className="text-2xl font-bold">Admissions Management</h2>
           <div className="flex gap-4">
             <Input
               placeholder="Search applications..."
@@ -692,19 +879,18 @@ export default function AdminDashboard() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
+        {/* Recent Applications Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Admission Applications for Your School</CardTitle>
-            <CardDescription>
-              Review and manage admission applications submitted for your school
-            </CardDescription>
+            <CardTitle>Recent Applications</CardTitle>
+            <CardDescription>Latest admission applications with current status</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -712,6 +898,55 @@ export default function AdminDashboard() {
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <span className="ml-2">Loading applications...</span>
               </div>
+            ) : dashboardData?.recent_applications?.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference ID</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>Course</TableHead>
+                    <TableHead>First Preference</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Enrollment</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dashboardData.recent_applications.map((app: any) => (
+                    <TableRow key={app.id}>
+                      <TableCell className="font-medium">{app.reference_id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{app.applicant_name}</div>
+                          <div className="text-sm text-gray-500">{app.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{app.course_applied}</TableCell>
+                      <TableCell className="text-sm">{app.first_preference_school}</TableCell>
+                      <TableCell>
+                        {app.school_decisions ? 
+                          getEnhancedStatusBadge(app, user?.school?.id) : 
+                          getStatusBadge(app.status)
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {getEnrollmentBadge(app.enrollment_status)}
+                        {app.enrolled_school && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            at {app.enrolled_school}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline">
+                          <Eye className="h-4 w-4 mr-1" />
+                          Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : filteredAdmissions.length === 0 ? (
               <div className="text-center py-16">
                 <div className="flex flex-col items-center gap-4">
@@ -721,12 +956,13 @@ export default function AdminDashboard() {
                     <p className="text-muted-foreground">
                       {searchTerm || filterStatus !== "all" 
                         ? "No applications match your current filters." 
-                        : "No admission applications have been submitted for your school yet."}
+                        : "No admission applications have been submitted yet."}
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
+              // Fallback to old admissions data structure
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -780,11 +1016,7 @@ export default function AdminDashboard() {
                           }
                         </TableCell>
                         <TableCell>
-                          {schoolDecision ? (
-                            getStatusBadge(schoolDecision.decision || 'pending')
-                          ) : (
-                            <Badge variant="secondary">Pending</Badge>
-                          )}
+                          {getEnhancedStatusBadge(application, user?.school?.id)}
                         </TableCell>
                         <TableCell>
                           {application.application_date 
@@ -917,6 +1149,68 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Pending Reviews Table */}
+        {dashboardData?.pending_reviews?.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Reviews</CardTitle>
+              <CardDescription>School decisions awaiting review</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference ID</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead>School</TableHead>
+                    <TableHead>Preference</TableHead>
+                    <TableHead>Course</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Applied Date</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dashboardData.pending_reviews.map((review: any) => (
+                    <TableRow key={review.id}>
+                      <TableCell className="font-medium">{review.reference_id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{review.applicant_name}</div>
+                          <div className="text-sm text-gray-500">{review.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{review.school_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{review.preference_order}</Badge>
+                      </TableCell>
+                      <TableCell>{review.course_applied}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{review.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {new Date(review.application_date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="default">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Accept
+                          </Button>
+                          <Button size="sm" variant="destructive">
+                            <UserX className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   };
@@ -1236,9 +1530,17 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <Label className="font-medium text-xs text-gray-500">Overall Status</Label>
-                      <Badge variant={selectedApplication.status === 'approved' || selectedApplication.status === 'accepted' ? 'default' : 'secondary'}>
-                        {selectedApplication.status?.charAt(0).toUpperCase() + selectedApplication.status?.slice(1)}
-                      </Badge>
+                      {(() => {
+                        const overallStatus = getOverallApplicationStatus(selectedApplication);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={overallStatus.variant} className={overallStatus.className}>
+                              {overallStatus.status}
+                            </Badge>
+                            <p className="text-xs text-gray-600">{overallStatus.details}</p>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div>
                       <Label className="font-medium text-xs text-gray-500">Review Comments</Label>
@@ -1266,8 +1568,8 @@ export default function AdminDashboard() {
                                 <p className="text-xs text-gray-600">Comments: {decision.review_comments}</p>
                               )}
                             </div>
-                            <Badge variant={decision.status === 'accepted' ? 'default' : decision.status === 'rejected' ? 'destructive' : 'secondary'}>
-                              {(decision.status || 'pending')?.charAt(0).toUpperCase() + (decision.status || 'pending')?.slice(1)}
+                            <Badge variant={decision.decision === 'accepted' ? 'default' : decision.decision === 'rejected' ? 'destructive' : 'secondary'}>
+                              {(decision.decision || 'pending')?.charAt(0).toUpperCase() + (decision.decision || 'pending')?.slice(1)}
                             </Badge>
                           </div>
                         ))}

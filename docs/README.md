@@ -1,53 +1,136 @@
 # Acharya ERP Documentation
 
-Welcome to the comprehensive documentation for the Acharya Multi-School Management System. This documentation provides detailed information about the system's architecture, APIs, deployment, and testing strategies.
+Welcome to the comprehensive documentation for the Acharya Multi-School Management System. This documentation provides detailed information about the system's architecture, APIs, and deployment procedures.
 
-## � Documentation Index
+## 📚 Documentation Overview
 
-### 🏗️ [Architecture Guide](ARCHITECTURE.md)
-Complete system architecture documentation including:
-- **System Overview** - High-level architecture and components
-- **Technology Stack** - Backend, frontend, and infrastructure technologies
-- **Data Models** - Database schema and relationships
-- **API Design** - RESTful API architecture and patterns
-- **Frontend Architecture** - React components and state management
-- **Security Model** - Authentication, authorization, and security measures
-- **Scalability Considerations** - Performance and scaling strategies
+The Acharya ERP system is a comprehensive Educational Resource Planning platform designed for multi-school management in Rajasthan. It features a modern architecture with Django REST Framework backend and React TypeScript frontend, supporting complex admission workflows, fee management, and administrative operations.
 
-### 🔌 [API Documentation](API_DOCUMENTATION.md)
-Comprehensive API reference including:
-- **Authentication APIs** - Login, logout, token management
-- **Admissions APIs** - Application submission and review
-- **User Management APIs** - User CRUD operations and profiles
-- **School Management APIs** - School data and dashboard endpoints
-- **Fee Management APIs** - Invoice and payment tracking
-- **Error Handling** - Standard error responses and codes
-- **Request/Response Examples** - Complete API usage examples
+## 🏗️ [System Architecture](ARCHITECTURE.md)
+**Complete system design and implementation details**
 
-### 🚀 [Deployment Guide](DEPLOYMENT.md)
-Production deployment instructions covering:
-- **System Requirements** - Hardware and software prerequisites
-- **Development Setup** - Local development environment
-- **Production Deployment** - Server setup and configuration
-- **Database Configuration** - PostgreSQL setup and optimization
-- **Web Server Setup** - Nginx configuration and SSL
-- **Monitoring & Maintenance** - Logging, backups, and health checks
-- **Security Checklist** - Production security best practices
-- **Troubleshooting** - Common issues and solutions
+- **Technology Stack**: Django 5.0+ with DRF, React 18+ with TypeScript, PostgreSQL/SQLite
+- **Backend Architecture**: 15+ Django apps with JWT authentication and role-based access
+- **Frontend Architecture**: Modern React with shadcn/ui components and Tailwind CSS
+- **Database Schema**: Comprehensive models for users, schools, admissions, and academic management
+- **Key Features**: Multi-school admission workflow, category-based fee system, real-time status tracking
+- **Security Model**: JWT tokens, role-based permissions, input validation, file upload security
+- **Performance**: Database optimization, API pagination, caching strategies
 
-### 🧪 [Testing Guide](TESTING.md)
-Complete testing strategies and implementation:
-- **Testing Framework Overview** - Backend and frontend testing tools
-- **Unit Testing** - Model, service, and component tests
-- **Integration Testing** - API and database integration tests
-- **End-to-End Testing** - Full user workflow testing
-- **Performance Testing** - Load testing and optimization
-- **Test Automation** - CI/CD pipeline integration
-- **Coverage & Quality** - Code coverage and quality metrics
+**Core Applications:**
+- **Users & Schools**: Multi-role authentication with school-specific access
+- **Admissions**: Complete workflow from email verification to enrollment
+- **Academic Management**: Students, staff, fees, attendance, exams, hostel, library
+- **System Features**: Notifications, reports, analytics, dashboards
 
-### 🛠️ Development & Maintenance
-- **[Issue Resolution Summary](./issue-resolution-summary.md)** - Common problems and their solutions
-- **[Context](./context.md)** - Project context and background information
+## 🔌 [API Reference](API_REFERENCE.md)
+**Comprehensive API documentation with examples**
+
+- **Authentication APIs**: JWT login/logout, user management, role-based access
+- **Admission APIs**: Email verification, application submission, tracking, enrollment
+- **Admin APIs**: Dashboard data, application review, decision management
+- **School Management**: Statistics, configurations, multi-school support
+- **Academic APIs**: Student management, fee calculation, attendance, exams
+- **File Management**: Document upload, secure file serving, validation
+
+**API Features:**
+- RESTful design with consistent JSON responses
+- JWT authentication with token blacklisting
+- Role-based permissions per endpoint
+- File upload support with security validation
+- Comprehensive error handling and status codes
+- Rate limiting and pagination support
+
+## 🚀 [Deployment Guide](DEPLOYMENT.md)
+**Complete setup instructions for development and production**
+
+### Development Setup
+- **Prerequisites**: Python 3.11+, Node.js 18+, UV package manager, Bun runtime
+- **Backend**: Django development server with SQLite database
+- **Frontend**: Vite development server with hot reload
+- **Environment**: Local configuration with CORS and debug settings
+
+### Production Deployment
+- **Server Requirements**: Ubuntu 22.04+, PostgreSQL 15+, Nginx 1.18+
+- **Security**: SSL certificates, firewall configuration, fail2ban protection
+- **Process Management**: Systemd services with auto-restart and monitoring
+- **Performance**: Database optimization, static file caching, log rotation
+- **Maintenance**: Backup strategies, update procedures, health monitoring
+
+**Deployment Features:**
+- Automated SSL certificate management with Let's Encrypt
+- Production-grade security headers and CORS configuration
+- Database migration and static file management
+- Comprehensive logging and error tracking
+- Backup automation with retention policies
+
+## 🎯 Key System Features
+
+### Multi-School Admission System
+- **Email Verification**: OTP-based verification before application submission
+- **School Preferences**: Students can apply to up to 3 schools in preference order
+- **Independent Review**: Each school reviews and decides on applications separately
+- **Student Choice**: Students can choose from multiple accepted schools
+- **Enrollment Tracking**: Complete enrollment/withdrawal workflow with date tracking
+
+### Category-Based Fee Management
+- **Dynamic Calculation**: Fee calculation based on class (1-8, 9-10, 11-12) and category (General, SC/ST/OBC/SBC)
+- **Flexible Structures**: Support for fee ranges and fixed amounts
+- **Real-time Display**: Frontend integration with immediate fee calculation
+- **Payment Integration**: Payment initialization and tracking workflow
+
+### Administrative Dashboard
+- **Role-based Access**: Different dashboards for Admin, Student, Parent, Faculty, Warden
+- **Real-time Updates**: Live application status and enrollment tracking
+- **Bulk Operations**: Efficient handling of multiple applications and decisions
+- **Comprehensive Reporting**: Analytics and reports across all system modules
+
+### Document Management
+- **Secure Upload**: File validation with type and size restrictions
+- **Document Serving**: Secure file access with proper authentication
+- **Storage Management**: Organized document storage with backup support
+
+## 🛠️ Development Information
+
+### Recent Enhancements
+- **Fixed Fee Calculation**: Improved regex-based course parsing for accurate fee mapping (class-12 → 11-12 range)
+- **Enhanced Status Display**: Comprehensive status aggregation across multiple schools
+- **TypeScript Error Resolution**: Fixed missing function scope issues in AdminDashboard
+- **Documentation Cleanup**: Consolidated 30+ files into 3 comprehensive documents
+
+### Technology Choices
+- **UV Package Manager**: Modern Python dependency management
+- **Bun Runtime**: Fast JavaScript runtime and package manager
+- **shadcn/ui Components**: Modern, accessible UI component library
+- **JWT Authentication**: Secure token-based authentication with blacklisting
+- **PostgreSQL**: Production-grade database with proper indexing
+
+## 📞 Support & Maintenance
+
+### Monitoring
+- Application health checks and automated restart procedures
+- Comprehensive logging across all system components
+- Database performance monitoring and optimization
+- SSL certificate auto-renewal and security monitoring
+
+### Backup & Recovery
+- Automated daily database backups with 7-day retention
+- Media file backup and restoration procedures
+- Database migration and rollback strategies
+
+### Security
+- Regular security updates and dependency management
+- Input validation and sanitization across all endpoints
+- File upload security with virus scanning capability
+- Rate limiting and DDoS protection measures
+
+---
+
+**System Status**: Production Ready ✅  
+**Last Updated**: January 2025  
+**Version**: 1.0.0  
+
+For technical support or questions about implementation, refer to the specific documentation sections above or review the troubleshooting sections in the Deployment Guide.
 - **[TODO](./TODO.md)** - Current development tasks and future enhancements
 
 ## 🎯 Project Overview
@@ -144,7 +227,27 @@ For development questions or issues:
 2. Review the API Reference for endpoint details
 3. Consult the Migration Troubleshooting guide for database issues
 
-## 📄 License
+## � Project Organization
+
+### Documentation Structure
+All documentation is organized in the `docs/` folder with three main documents:
+- **ARCHITECTURE.md**: System design, features, and technical implementation
+- **API_REFERENCE.md**: Complete API documentation with examples
+- **DEPLOYMENT.md**: Setup and deployment instructions
+
+### Test Structure
+All test files are organized in the `backend/test/` folder:
+- **Test Scripts**: Data validation and enrollment logic testing
+- **Debug Tools**: Application status and data consistency verification
+- **Cleanup Scripts**: Database maintenance and data repair utilities
+
+### Future Development Guidelines
+- **Documentation**: All new documentation should be added to the `docs/` folder
+- **Testing**: All test files should be placed in the `backend/test/` folder
+- **Integration**: Related markdown files should be consolidated into the main docs
+- **Organization**: Keep project structure clean and well-organized
+
+## �📄 License
 
 This project is developed for the Government of Rajasthan and follows government software development guidelines.
 

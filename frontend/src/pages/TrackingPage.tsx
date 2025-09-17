@@ -226,7 +226,7 @@ export default function TrackingPage() {
 
         if (enrollResult.success) {
           toast({
-            title: "Enrollment Confirmed! 🎉",
+            title: "Enrollment Confirmed!",
             description: "Your free enrollment has been confirmed. Check your email for details.",
           });
           
@@ -252,7 +252,7 @@ export default function TrackingPage() {
 
             if (enrollResult.success) {
               toast({
-                title: "Payment Successful! 🎉",
+                title: "Payment Successful!",
                 description: "Your enrollment has been confirmed. Check your email for details.",
               });
               
@@ -465,7 +465,8 @@ export default function TrackingPage() {
                     const hasAnyEnrollment = trackingResult.data.school_decisions?.some(d => d.enrollment_status === 'enrolled');
                     
                     // Override canEnroll if student has any active enrollment elsewhere
-                    const finalCanEnroll = canEnroll && !hasAnyEnrollment;
+                    // Also ensure decision is accepted before allowing enrollment
+                    const finalCanEnroll = canEnroll && !hasAnyEnrollment && decision.decision === 'accepted';
                     
                     return (
                       <div key={index} className={`p-3 border rounded-md ${
@@ -568,7 +569,7 @@ export default function TrackingPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
                     <div>
-                      <h4 className="font-semibold text-green-800 text-sm">🎉 Enrollment Confirmed!</h4>
+                      <h4 className="font-semibold text-green-800 text-sm">Enrollment Confirmed!</h4>
                       <p className="text-xs text-green-700">
                         You have active enrollments. Check email for instructions.
                       </p>
@@ -583,10 +584,10 @@ export default function TrackingPage() {
                     <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                     <div>
                       <h4 className="font-semibold text-blue-800 text-sm">
-                        🎉 {acceptedSchools.length} Acceptance{acceptedSchools.length > 1 ? 's' : ''}!
+                        {acceptedSchools.length} Acceptance{acceptedSchools.length > 1 ? 's' : ''}!
                       </h4>
                       <p className="text-xs text-blue-700">
-                        Click "Accept & Proceed" to enroll in any accepted school.
+                        Click "Accept & Proceed" to enroll in any school that has accepted your application.
                       </p>
                     </div>
                   </div>
@@ -595,7 +596,7 @@ export default function TrackingPage() {
 
               {trackingResult.data.review_comments && (
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <h4 className="font-semibold text-yellow-800 text-sm mb-1">📝 Comments</h4>
+                  <h4 className="font-semibold text-yellow-800 text-sm mb-1">Comments</h4>
                   <p className="text-xs text-yellow-700">{trackingResult.data.review_comments}</p>
                 </div>
               )}
@@ -683,7 +684,7 @@ export default function TrackingPage() {
                   </div>
                   {paymentInfo.fee_structure?.total_fee === 0 && (
                     <div className="text-center p-2 bg-green-50 rounded-md">
-                      <p className="text-green-700 font-medium text-sm">🎉 Free Education!</p>
+                      <p className="text-green-700 font-medium text-sm">Free Education!</p>
                       <p className="text-xs text-green-600">No fee required for this class and category</p>
                     </div>
                   )}
@@ -701,7 +702,7 @@ export default function TrackingPage() {
                       onClick={() => handlePaymentMethod('online')}
                     >
                       <div>
-                        <p className="font-medium text-sm">💳 Online Payment</p>
+                        <p className="font-medium text-sm">Online Payment</p>
                         <p className="text-xs text-gray-500">Pay securely using UPI, Net Banking, or Cards</p>
                       </div>
                     </Button>
