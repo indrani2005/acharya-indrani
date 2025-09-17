@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import EnhancedDashboardLayout from "@/components/EnhancedDashboardLayout";
 import { 
   Settings, 
@@ -32,7 +33,8 @@ import {
   UserPlus,
   FileX,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Eye
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
@@ -47,6 +49,8 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Real data states
   const [schoolStats, setSchoolStats] = useState<SchoolStats>({
@@ -704,7 +708,17 @@ export default function AdminDashboard() {
                   {filteredAdmissions.map((application) => {
                     // Find the school decision for this school
                     const schoolDecision = application.school_decisions?.find(
-                      decision => decision.school === profile?.school
+                      decision => {
+                        // Handle both object and ID comparisons
+                        const decisionSchoolId = typeof decision.school === 'object' 
+                          ? decision.school.id 
+                          : decision.school;
+                        const profileSchoolId = typeof profile?.school === 'object'
+                          ? profile.school.id
+                          : profile?.school;
+                        
+                        return decisionSchoolId === profileSchoolId;
+                      }
                     );
                     
                     return (
@@ -713,13 +727,34 @@ export default function AdminDashboard() {
                         <TableCell>{application.full_name}</TableCell>
                         <TableCell>{application.email}</TableCell>
                         <TableCell>{application.phone}</TableCell>
-                        <TableCell>{new Date(application.date_of_birth).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {application.date_of_birth 
+                            ? new Date(application.date_of_birth).toLocaleDateString() 
+                            : 'Not provided'
+                          }
+                        </TableCell>
                         <TableCell>
                           {schoolDecision ? getStatusBadge(schoolDecision.status) : <Badge variant="secondary">Pending</Badge>}
                         </TableCell>
-                        <TableCell>{new Date(application.submitted_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {application.submitted_at 
+                            ? new Date(application.submitted_at).toLocaleDateString() 
+                            : 'Not submitted'
+                          }
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedApplication(application);
+                                setShowDetailsModal(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View Details
+                            </Button>
                             {(!schoolDecision || schoolDecision.status === 'pending') && (
                               <>
                                 <Button
@@ -830,6 +865,167 @@ export default function AdminDashboard() {
       sidebarContent={sidebarContent}
     >
       {renderTabContent()}
+      
+      {/* Application Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Application Details</DialogTitle>
+            <DialogDescription>
+              Complete application information for review
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedApplication && (
+            <div className="space-y-6">
+              {/* Personal Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Personal Information</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-semibold">Full Name</Label>
+                    <p>{selectedApplication.applicant_name}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Email</Label>
+                    <p>{selectedApplication.email}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Phone Number</Label>
+                    <p>{selectedApplication.phone_number}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Date of Birth</Label>
+                    <p>{selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Address</Label>
+                    <p>{selectedApplication.address}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Course Applied</Label>
+                    <p>{selectedApplication.course_applied}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Previous School</Label>
+                    <p>{selectedApplication.previous_school}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Last Percentage</Label>
+                    <p>{selectedApplication.last_percentage}%</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* School Preferences */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>School Preferences</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="font-semibold">First Preference</Label>
+                    <p>{selectedApplication.first_preference_school?.school_name || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Second Preference</Label>
+                    <p>{selectedApplication.second_preference_school?.school_name || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Third Preference</Label>
+                    <p>{selectedApplication.third_preference_school?.school_name || 'Not specified'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Application Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Application Status</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-semibold">Reference ID</Label>
+                    <p>{selectedApplication.reference_id}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Application Date</Label>
+                    <p>{selectedApplication.application_date ? new Date(selectedApplication.application_date).toLocaleDateString() : 'Not available'}</p>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Overall Status</Label>
+                    <Badge variant={selectedApplication.status === 'approved' || selectedApplication.status === 'accepted' ? 'default' : 'secondary'}>
+                      {selectedApplication.status?.charAt(0).toUpperCase() + selectedApplication.status?.slice(1)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="font-semibold">Review Comments</Label>
+                    <p>{selectedApplication.review_comments || 'No comments yet'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Documents */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Uploaded Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedApplication.documents && Object.keys(selectedApplication.documents).length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3">
+                      {Object.entries(selectedApplication.documents).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between p-3 border rounded">
+                          <div>
+                            <Label className="font-semibold">{key.replace(/_/g, ' ').toUpperCase()}</Label>
+                            <p className="text-sm text-gray-600">{value as string}</p>
+                          </div>
+                          <Button size="sm" variant="outline">
+                            <FileText className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No documents uploaded</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* School Decisions */}
+              {selectedApplication.school_decisions && selectedApplication.school_decisions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>School Decision Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedApplication.school_decisions.map((decision, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 border rounded">
+                          <div>
+                            <Label className="font-semibold">
+                              {typeof decision.school === 'object' && decision.school ? (decision.school as any).school_name : decision.school}
+                            </Label>
+                            <p className="text-sm text-gray-600">Preference: {decision.preference_order}</p>
+                            {decision.review_comments && (
+                              <p className="text-sm text-gray-600">Comments: {decision.review_comments}</p>
+                            )}
+                          </div>
+                          <Badge variant={decision.status === 'accepted' ? 'default' : decision.status === 'rejected' ? 'destructive' : 'secondary'}>
+                            {(decision.status || 'pending')?.charAt(0).toUpperCase() + (decision.status || 'pending')?.slice(1)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </EnhancedDashboardLayout>
   );
 }

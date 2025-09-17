@@ -7,6 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
 
@@ -69,6 +72,12 @@ const EnhancedDashboardLayout = ({ children, title, user, profile, sidebarConten
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-80 bg-white">
+                  <SheetHeader>
+                    <SheetTitle>Navigation Menu</SheetTitle>
+                    <SheetDescription>
+                      Access the main navigation and menu options
+                    </SheetDescription>
+                  </SheetHeader>
                   {sidebarContent}
                 </SheetContent>
               </Sheet>

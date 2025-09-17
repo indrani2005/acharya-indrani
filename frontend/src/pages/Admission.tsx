@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CalendarIcon, ArrowLeft, Upload, CheckCircle, Loader2, Search } from "lucide-react";
-import { format } from "date-fns";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import "../styles/datepicker.css";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { admissionService, schoolService } from "@/lib/api/services";
@@ -40,7 +40,7 @@ const Admission = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState<any>(null);
   const [step, setStep] = useState(1);
-  const [date, setDate] = useState<Date>();
+  const [date, setDate] = useState<Date | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
   const [trackingId, setTrackingId] = useState("");
@@ -58,6 +58,16 @@ const Admission = () => {
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
+
+  // Helper function to safely get school name from school object or string
+  const getSchoolName = (school: any, schoolName?: string): string => {
+    if (schoolName) return schoolName;
+    if (typeof school === 'string') return school;
+    if (typeof school === 'object' && school) {
+      return school.school_name || school.name || 'Unknown School';
+    }
+    return 'Unknown School';
+  };
   
   const [formData, setFormData] = useState<AdmissionFormData>({
     applicant_name: "",
@@ -547,7 +557,7 @@ const Admission = () => {
                   Track Application
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Track Your Application</DialogTitle>
                   <DialogDescription>
@@ -637,13 +647,13 @@ const Admission = () => {
                             <div className="space-y-2">
                               {trackingResult.data.school_decisions.map((decision, index) => (
                                 <div key={index} className="flex justify-between items-center">
-                                  <span>{decision.school_name || decision.school}</span>
+                                  <span>{getSchoolName(decision.school, decision.school_name)}</span>
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${
                                     decision.status === 'accepted' ? 'bg-green-100 text-green-800' :
                                     decision.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                     'bg-yellow-100 text-yellow-800'
                                   }`}>
-                                    {decision.status.toUpperCase()}
+                                    {decision.status ? decision.status.toUpperCase() : 'PENDING'}
                                   </span>
                                 </div>
                               ))}
@@ -665,7 +675,7 @@ const Admission = () => {
                                   variant="outline"
                                   size="sm"
                                   className="w-full justify-start"
-                                  onClick={() => handleStudentChoice(school.school)}
+                                  onClick={() => handleStudentChoice(getSchoolName(school.school))}
                                   disabled={isSubmittingChoice}
                                 >
                                   {isSubmittingChoice ? (
@@ -673,7 +683,7 @@ const Admission = () => {
                                   ) : (
                                     <CheckCircle className="mr-2 h-4 w-4" />
                                   )}
-                                  Choose {school.school_name || school.school}
+                                  Choose {getSchoolName(school.school, school.school_name)}
                                 </Button>
                               ))}
                             </div>
@@ -728,53 +738,30 @@ const Admission = () => {
                     <div className="space-y-2">
                       <Label className="text-gray-700">Date of Birth *</Label>
                       <div className="relative">
-                        <Input
-                          type="text"
-                          placeholder="YYYY-MM-DD (e.g. 2000-12-31)"
-                          value={formData.date_of_birth}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            handleInputChange('date_of_birth', value);
-                            
-                            // Try to parse the date if it's a valid format
-                            if (value && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                              const parsedDate = new Date(value + 'T00:00:00'); // Add time to avoid timezone issues
-                              if (!isNaN(parsedDate.getTime())) {
-                                setDate(parsedDate);
-                              }
-                            } else if (!value) {
-                              setDate(undefined);
+                        <DatePicker
+                          selected={date}
+                          onChange={(selectedDate: Date | null) => {
+                            setDate(selectedDate);
+                            if (selectedDate) {
+                              const formattedDate = selectedDate.toISOString().split('T')[0];
+                              handleInputChange('date_of_birth', formattedDate);
+                            } else {
+                              handleInputChange('date_of_birth', '');
                             }
                           }}
-                          className="border-gray-300 pr-10"
+                          dateFormat="yyyy-MM-dd"
+                          placeholderText="Select date of birth"
+                          maxDate={new Date()}
+                          showYearDropdown
+                          showMonthDropdown
+                          dropdownMode="select"
+                          yearDropdownItemNumber={50}
+                          scrollableYearDropdown
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          calendarClassName="shadow-lg border-gray-200"
+                          required
                         />
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 h-8 w-8 hover:bg-gray-100"
-                              type="button"
-                            > 
-                              <CalendarIcon className="h-4 w-4 text-gray-500" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar 
-                              mode="single" 
-                              selected={date} 
-                              onSelect={(selectedDate) => { 
-                                setDate(selectedDate); 
-                                handleInputChange('date_of_birth', selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''); 
-                              }} 
-                              initialFocus 
-                              captionLayout="dropdown-buttons"
-                              fromYear={1950}
-                              toYear={new Date().getFullYear()}
-                              className="rounded-md border"
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <CalendarIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                       </div>
                     </div>
                     <div className="space-y-2">

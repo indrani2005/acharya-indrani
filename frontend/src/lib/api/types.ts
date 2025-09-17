@@ -99,9 +99,9 @@ export interface AdmissionApplication {
   phone_number: string;
   address: string;
   course_applied: string;
-  first_preference_school?: number;
-  second_preference_school?: number;
-  third_preference_school?: number;
+  first_preference_school?: School;
+  second_preference_school?: School;
+  third_preference_school?: School;
   previous_school?: string;
   last_percentage?: number;
   documents?: Record<string, string>;
@@ -114,9 +114,17 @@ export interface AdmissionApplication {
 
 export interface SchoolAdmissionDecision {
   id: number;
-  school: string;
+  school: School | string | null; // Can be either a School object, school ID string, or null
   school_name?: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  application?: string;
+  preference_order?: string;
+  decision: 'pending' | 'accepted' | 'rejected';
+  decision_date?: string | null;
+  review_comments?: string;
+  is_student_choice?: boolean;
+  student_choice_date?: string | null;
+  reviewed_by?: number | null;
+  status?: 'pending' | 'accepted' | 'rejected'; // Alias for decision
   review_date?: string;
   notes?: string;
 }

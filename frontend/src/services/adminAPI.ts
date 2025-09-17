@@ -221,7 +221,7 @@ export const adminAPI = {
     try {
       const response = await apiClient.get('/admissions/school-review/');
       // Handle both direct array and wrapped response
-      return Array.isArray(response.data) ? response.data : response.data.data || [];
+      return Array.isArray(response.data) ? response.data : response.data.results || response.data.data || [];
     } catch (error) {
       console.error('Error fetching school admissions:', error);
       return [];
