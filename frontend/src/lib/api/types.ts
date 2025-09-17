@@ -99,6 +99,7 @@ export interface AdmissionApplication {
   email: string;
   phone_number: string;
   address: string;
+  category?: string;
   course_applied: string;
   first_preference_school?: number | School; // Can accept both for flexibility
   second_preference_school?: number | School;
@@ -128,6 +129,15 @@ export interface SchoolAdmissionDecision {
   status?: 'pending' | 'accepted' | 'rejected'; // Alias for decision
   review_date?: string;
   notes?: string;
+  // New enrollment tracking fields
+  enrollment_status?: 'not_enrolled' | 'enrolled' | 'withdrawn';
+  enrollment_date?: string | null;
+  withdrawal_date?: string | null;
+  withdrawal_reason?: string;
+  payment_status?: 'pending' | 'completed' | 'failed' | 'waived';
+  payment_reference?: string;
+  can_enroll?: boolean;
+  can_withdraw?: boolean;
 }
 
 export interface AdmissionTrackingResponse {
@@ -136,6 +146,7 @@ export interface AdmissionTrackingResponse {
     reference_id: string;
     applicant_name: string;
     course_applied: string;
+    category?: string;
     status: string;
     first_preference_school?: School;
     second_preference_school?: School;

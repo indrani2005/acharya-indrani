@@ -139,23 +139,148 @@ export default function TrackingPage() {
     }
   };
 
-  const handlePaymentMethod = (method: string) => {
-    // Here you would integrate with actual payment gateways
-    toast({
-      title: "Payment Gateway",
-      description: `Redirecting to ${method} payment portal...`,
-    });
+  const handleAcceptAndProceed = async (selectedSchool: SchoolAdmissionDecision) => {
+    if (!trackingResult?.data?.reference_id) return;
     
-    // For demonstration purposes, simulate payment success after 2 seconds
-    setTimeout(() => {
-      toast({
-        title: "Payment Successful! 🎉",
-        description: "Your enrollment has been confirmed. Check your email for details.",
+    try {
+      // First calculate the fee for this student
+      const feeResult = await admissionService.calculateFee({
+        reference_id: trackingResult.data.reference_id
       });
-      setShowPaymentModal(false);
-    }, 2000);
+      
+      if (feeResult.success) {
+        // Set payment info with fee calculation
+        setPaymentInfo({
+          ...feeResult.data,
+          school_name: getSchoolName(selectedSchool.school, selectedSchool.school_name),
+          selected_school: selectedSchool
+        });
+        setShowPaymentModal(true);
+        
+        toast({
+          title: "Ready for Payment",
+          description: `Fee calculated for ${getSchoolName(selectedSchool.school, selectedSchool.school_name)}`,
+        });
+      } else {
+        throw new Error(feeResult.message || 'Failed to calculate fee');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to calculate fee. Please try again.",
+        variant: "destructive",
+      });
+      
+      console.error('Fee calculation error:', error);
+    }
+  };
+
+  const handleWithdrawEnrollment = async (schoolDecision: SchoolAdmissionDecision) => {
+    if (!schoolDecision.id) return;
     
-    console.log('Payment method selected:', method, 'for amount:', paymentInfo?.fee_structure?.total_fee);
+    try {
+      const result = await admissionService.withdrawEnrollment({
+        decision_id: schoolDecision.id,
+        withdrawal_reason: 'Student requested withdrawal'
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Enrollment Withdrawn",
+          description: `Successfully withdrawn from ${getSchoolName(schoolDecision.school, schoolDecision.school_name)}`,
+        });
+        
+        // Refresh tracking data to show updated status
+        await handleTrackApplication();
+      } else {
+        throw new Error(result.message || 'Failed to withdraw enrollment');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to withdraw enrollment. Please try again.",
+        variant: "destructive",
+      });
+      
+      console.error('Withdrawal error:', error);
+    }
+  };
+
+  const handlePaymentMethod = async (method: string) => {
+    if (!paymentInfo?.selected_school?.id) {
+      toast({
+        title: "Error",
+        description: "No school selected for enrollment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (method === 'free_enrollment') {
+        // Enroll student directly for free enrollment
+        const enrollResult = await admissionService.enrollStudent({
+          decision_id: paymentInfo.selected_school.id,
+          payment_reference: 'FREE_ENROLLMENT'
+        });
+
+        if (enrollResult.success) {
+          toast({
+            title: "Enrollment Confirmed! 🎉",
+            description: "Your free enrollment has been confirmed. Check your email for details.",
+          });
+          
+          // Refresh tracking data to show updated status
+          await handleTrackApplication();
+        } else {
+          throw new Error(enrollResult.message || 'Failed to confirm enrollment');
+        }
+      } else {
+        // For paid enrollments, simulate payment and then enroll
+        toast({
+          title: "Payment Gateway",
+          description: `Redirecting to ${method} payment portal...`,
+        });
+        
+        // Simulate payment success after 2 seconds
+        setTimeout(async () => {
+          try {
+            const enrollResult = await admissionService.enrollStudent({
+              decision_id: paymentInfo.selected_school.id,
+              payment_reference: `PAYMENT_${method.toUpperCase()}_${Date.now()}`
+            });
+
+            if (enrollResult.success) {
+              toast({
+                title: "Payment Successful! 🎉",
+                description: "Your enrollment has been confirmed. Check your email for details.",
+              });
+              
+              // Refresh tracking data to show updated status
+              await handleTrackApplication();
+            } else {
+              throw new Error(enrollResult.message || 'Failed to confirm enrollment');
+            }
+          } catch (error) {
+            toast({
+              title: "Enrollment Error",
+              description: "Payment successful but enrollment failed. Please contact support.",
+              variant: "destructive",
+            });
+          }
+        }, 2000);
+      }
+      
+      setShowPaymentModal(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process enrollment. Please try again.",
+        variant: "destructive",
+      });
+      
+      console.error('Enrollment error:', error);
+    }
   };
 
   const getSchoolName = (school: any, schoolName?: string): string => {
@@ -168,11 +293,11 @@ export default function TrackingPage() {
   const getStatusBadge = (decision: string) => {
     switch (decision) {
       case 'accepted':
-        return <Badge className="bg-green-500 text-white"><CheckCircle className="w-3 h-3 mr-1" />ACCEPTED</Badge>;
+        return <Badge className="bg-green-500 text-white text-xs px-2 py-0.5"><CheckCircle className="w-2 h-2 mr-1" />ACCEPTED</Badge>;
       case 'rejected':
-        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />REJECTED</Badge>;
+        return <Badge variant="destructive" className="text-xs px-2 py-0.5"><AlertCircle className="w-2 h-2 mr-1" />REJECTED</Badge>;
       default:
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />PENDING</Badge>;
+        return <Badge variant="secondary" className="text-xs px-2 py-0.5"><Clock className="w-2 h-2 mr-1" />PENDING</Badge>;
     }
   };
 
@@ -180,12 +305,27 @@ export default function TrackingPage() {
     if (!trackingResult?.data?.school_decisions) return "PENDING";
     
     const decisions = trackingResult.data.school_decisions;
+    const hasEnrolled = decisions.some(d => d.enrollment_status === 'enrolled');
     const hasAccepted = decisions.some(d => d.decision === 'accepted');
     const allDecided = decisions.every(d => d.decision && d.decision !== 'pending');
     
+    if (hasEnrolled) return "ENROLLED";
     if (hasAccepted) return "ACCEPTED";
     if (allDecided) return "REJECTED";
     return "PENDING";
+  };
+
+  const hasEnrollment = () => {
+    return trackingResult?.data?.school_decisions?.some(d => 
+      d.enrollment_status === 'enrolled'
+    ) || false;
+  };
+
+  const getEnrolledSchoolName = () => {
+    const enrolledDecision = trackingResult?.data?.school_decisions?.find(d => 
+      d.enrollment_status === 'enrolled'
+    );
+    return enrolledDecision ? getSchoolName(enrolledDecision.school, enrolledDecision.school_name) : '';
   };
 
   // Handle URL parameter on page load
@@ -219,26 +359,34 @@ export default function TrackingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-hero">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-4xl font-bold text-white mb-2">Track Your Application</h1>
-          <p className="text-white/80">Enter your reference ID to check your application status</p>
-        </div>
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Conditional Header - Large initially, compact after search */}
+        {!trackingResult ? (
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold text-white mb-2">Track Your Application</h1>
+            <p className="text-white/80">Enter your reference ID to check your application status</p>
+          </div>
+        ) : (
+          <div className="text-center mb-3">
+            <h1 className="text-2xl font-bold text-white mb-1">Application Tracking</h1>
+          </div>
+        )}
 
-        {/* Search Form */}
-        <Card className="mb-6 shadow-2xl border-0">
-          <CardHeader className="bg-gradient-primary text-white">
-            <CardTitle className="flex items-center gap-2">
-              <Search className="w-5 h-5" />
-              Application Tracking
+        {/* Compact Search Form */}
+        <Card className="mb-4 shadow-2xl border-0">
+          <CardHeader className="bg-gradient-primary text-white py-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Search className="w-4 h-4" />
+              {!trackingResult ? 'Application Tracking' : 'Track Another Application'}
             </CardTitle>
-            <CardDescription className="text-white/90">
-              Enter your application reference ID (e.g., ADM-2025-QFYS29)
-            </CardDescription>
+            {!trackingResult && (
+              <CardDescription className="text-white/90 text-xs">
+                Enter your application reference ID (e.g., ADM-2025-QFYS29)
+              </CardDescription>
+            )}
           </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex gap-4">
+          <CardContent className="p-4">
+            <div className="flex gap-3">
               <Input
                 placeholder="Reference ID"
                 value={trackingId}
@@ -249,17 +397,17 @@ export default function TrackingPage() {
               <Button 
                 onClick={handleTrackApplication}
                 disabled={isTracking}
-                className="min-w-[120px] bg-gradient-primary hover:opacity-90"
+                className="min-w-[100px] bg-gradient-primary hover:opacity-90 text-sm px-4 py-2"
               >
                 {isTracking ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                     Tracking...
                   </>
                 ) : (
                   <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Track Application
+                    <Search className="mr-1 h-3 w-3" />
+                    {!trackingResult ? 'Track' : 'Track New'}
                   </>
                 )}
               </Button>
@@ -267,211 +415,204 @@ export default function TrackingPage() {
           </CardContent>
         </Card>
 
-        {/* Tracking Results */}
+        {/* Tracking Results - Ultra Compact Single Card */}
         {trackingResult?.success && trackingResult.data && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[calc(100vh-300px)] overflow-hidden">
-            {/* Left Column */}
-            <div className="space-y-4 overflow-y-auto pr-2">
-              {/* Application Overview */}
-              <Card className="shadow-xl border-0">
-                <CardHeader className="bg-gradient-primary text-white">
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Application Status</span>
-                    {getStatusBadge(getOverallStatus().toLowerCase())}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-1 gap-3">
+          <Card className="shadow-lg border-0 max-w-7xl mx-auto">
+            <CardHeader className="bg-gradient-primary text-white py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg">Application Status</CardTitle>
+                  <CardDescription className="text-white/90 text-xs">
+                    {trackingResult.data.reference_id}
+                  </CardDescription>
+                </div>
+                <Badge className={`${getOverallStatus() === 'ACCEPTED' ? 'bg-green-500' : getOverallStatus() === 'REJECTED' ? 'bg-red-500' : 'bg-yellow-500'} text-white px-2 py-1 text-xs`}>
+                  {getOverallStatus()}
+                </Badge>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-4">
+              {/* Student Info - Ultra Compact Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4 p-3 bg-gray-50 rounded-md">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Name</label>
+                  <p className="text-sm font-semibold truncate">{trackingResult.data.applicant_name}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Course</label>
+                  <p className="text-sm font-semibold truncate">{trackingResult.data.course_applied}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Category</label>
+                  <p className="text-sm font-semibold">{trackingResult.data.category?.toUpperCase() || 'General'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Applied</label>
+                  <p className="text-sm font-semibold">{new Date(trackingResult.data.application_date).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* School Decisions - Compact List */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base">School Decisions</h3>
+                <div className="space-y-2">
+                  {trackingResult.data.school_decisions?.map((decision, index) => {
+                    const isEnrolled = decision.enrollment_status === 'enrolled';
+                    const isWithdrawn = decision.enrollment_status === 'withdrawn';
+                    const canEnroll = decision.can_enroll;
+                    const canWithdraw = decision.can_withdraw;
+                    const hasAnyEnrollment = trackingResult.data.school_decisions?.some(d => d.enrollment_status === 'enrolled');
+                    
+                    // Override canEnroll if student has any active enrollment elsewhere
+                    const finalCanEnroll = canEnroll && !hasAnyEnrollment;
+                    
+                    return (
+                      <div key={index} className={`p-3 border rounded-md ${
+                        isEnrolled ? 'border-green-500 bg-green-50' : 
+                        isWithdrawn ? 'border-gray-300 bg-gray-50' : 
+                        'border-gray-200'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-sm truncate">{getSchoolName(decision.school, decision.school_name)}</h4>
+                              <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{decision.preference_order} pref</span>
+                              {getStatusBadge(decision.decision || 'pending')}
+                            </div>
+                            <div className="flex items-center gap-4">
+                              {decision.decision_date && (
+                                <p className="text-xs text-gray-500">
+                                  Reviewed: {new Date(decision.decision_date).toLocaleDateString()}
+                                </p>
+                              )}
+                              {isEnrolled && (
+                                <div className="flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <span className="text-xs font-medium text-green-700">ENROLLED</span>
+                                  <span className="text-xs text-gray-500">
+                                    ({new Date(decision.enrollment_date || '').toLocaleDateString()})
+                                  </span>
+                                </div>
+                              )}
+                              {isWithdrawn && (
+                                <div className="flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3 text-gray-600" />
+                                  <span className="text-xs font-medium text-gray-700">WITHDRAWN</span>
+                                  <span className="text-xs text-gray-500">
+                                    ({new Date(decision.withdrawal_date || '').toLocaleDateString()})
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Enroll Button - Only allow if no active enrollment anywhere */}
+                            {finalCanEnroll && (
+                              <Button
+                                size="sm"
+                                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-xs px-3 py-1 h-8"
+                                onClick={() => handleAcceptAndProceed(decision)}
+                              >
+                                Accept & Proceed
+                              </Button>
+                            )}
+                            
+                            {/* Withdraw Button */}
+                            {canWithdraw && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
+                                onClick={() => handleWithdrawEnrollment(decision)}
+                              >
+                                Withdraw
+                              </Button>
+                            )}
+                            
+                            {/* Status Messages */}
+                            {!finalCanEnroll && !canWithdraw && decision.decision === 'accepted' && !isEnrolled && !isWithdrawn && (
+                              <span className="text-xs text-amber-600 px-2 py-1 bg-amber-50 border border-amber-200 rounded">
+                                {hasAnyEnrollment ? 'Already enrolled elsewhere' : 'Cannot enroll'}
+                              </span>
+                            )}
+                            
+                            {!finalCanEnroll && !canWithdraw && decision.decision === 'pending' && (
+                              <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
+                                Pending Review
+                              </span>
+                            )}
+                            
+                            {!finalCanEnroll && !canWithdraw && decision.decision === 'rejected' && (
+                              <span className="text-xs text-red-600 px-2 py-1 bg-red-50 border border-red-200 rounded">
+                                Rejected
+                              </span>
+                            )}
+                            
+                            {isWithdrawn && !finalCanEnroll && (
+                              <span className="text-xs text-blue-600 px-2 py-1 bg-blue-50 border border-blue-200 rounded">
+                                Withdrawn - Can Re-enroll
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Status Alerts - Compact */}
+              {hasEnrollment() && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Reference ID:</label>
-                      <p className="font-mono text-lg">{trackingResult.data.reference_id}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Applicant:</label>
-                      <p className="text-lg">{trackingResult.data.applicant_name}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Course:</label>
-                      <p className="text-lg">{trackingResult.data.course_applied}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Applied:</label>
-                      <p className="text-lg">
-                        {new Date(trackingResult.data.application_date).toLocaleDateString()}
+                      <h4 className="font-semibold text-green-800 text-sm">🎉 Enrollment Confirmed!</h4>
+                      <p className="text-xs text-green-700">
+                        You have active enrollments. Check email for instructions.
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* School Preferences */}
-              <Card className="shadow-xl border-0">
-                <CardHeader className="bg-gradient-primary text-white">
-                  <CardTitle>School Preferences</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3">
-                  {trackingResult.data.first_preference_school && (
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium text-blue-600">1st Preference:</span>
-                        <p className="font-medium">{trackingResult.data.first_preference_school.school_name}</p>
-                      </div>
-                    </div>
-                  )}
-                  {trackingResult.data.second_preference_school && (
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">2nd Preference:</span>
-                        <p className="font-medium">{trackingResult.data.second_preference_school.school_name}</p>
-                      </div>
-                    </div>
-                  )}
-                  {trackingResult.data.third_preference_school && (
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">3rd Preference:</span>
-                        <p className="font-medium">{trackingResult.data.third_preference_school.school_name}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-4 overflow-y-auto pl-2">
-              {/* School Review Status */}
-              {trackingResult.data.school_decisions && trackingResult.data.school_decisions.length > 0 && (
-                <Card className="shadow-xl border-0">
-                  <CardHeader className="bg-gradient-primary text-white">
-                    <CardTitle>School Review Status</CardTitle>
-                    <CardDescription className="text-white/90">
-                      Review status from each school where you applied
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {trackingResult.data.school_decisions.map((decision, index) => (
-                        <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{getSchoolName(decision.school, decision.school_name)}</p>
-                            {decision.decision_date && (
-                              <p className="text-sm text-gray-500">
-                                Reviewed on {new Date(decision.decision_date).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                          {getStatusBadge(decision.decision || 'pending')}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
-              {/* Student Choice Interface */}
-              {acceptedSchools.length > 1 && (
-                <Card className="shadow-xl border-green-200 border-2">
-                  <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      🎉 Multiple Acceptances!
-                    </CardTitle>
-                    <CardDescription className="text-white/90">
-                      Congratulations! You've been accepted to multiple schools. Choose your preferred school to proceed with enrollment.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {acceptedSchools.map((school, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          size="lg"
-                          className="w-full justify-between border-green-200 hover:bg-green-50 h-auto p-4"
-                          onClick={() => handleStudentChoice(getSchoolName(school.school))}
-                          disabled={isSubmittingChoice}
-                        >
-                          <div className="text-left">
-                            <p className="font-medium">{getSchoolName(school.school, school.school_name)}</p>
-                            <p className="text-sm text-gray-500">Click to select this school</p>
-                          </div>
-                          {isSubmittingChoice ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          )}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                      <p className="text-sm text-green-700">
-                        <strong>Note:</strong> After selecting your preferred school, you'll be guided to the fee payment process.
+              {acceptedSchools.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-blue-800 text-sm">
+                        🎉 {acceptedSchools.length} Acceptance{acceptedSchools.length > 1 ? 's' : ''}!
+                      </h4>
+                      <p className="text-xs text-blue-700">
+                        Click "Accept & Proceed" to enroll in any accepted school.
                       </p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
 
-              {/* Single Acceptance with Fee Payment */}
-              {acceptedSchools.length === 1 && (
-                <Card className="shadow-xl border-green-200 border-2">
-                  <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      🎉 Congratulations!
-                    </CardTitle>
-                    <CardDescription className="text-white/90">
-                      You've been accepted! Proceed with enrollment and fee payment.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
-                      <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                        <h4 className="font-medium text-green-700 mb-2">Accepted School:</h4>
-                        <p className="text-lg font-semibold">{getSchoolName(acceptedSchools[0].school, acceptedSchools[0].school_name)}</p>
-                      </div>
-                      <Button
-                        size="lg"
-                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                        onClick={() => handleProceedToPayment(acceptedSchools[0])}
-                      >
-                        <CheckCircle className="mr-2 h-5 w-5" />
-                        Proceed to Fee Payment
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Comments */}
               {trackingResult.data.review_comments && (
-                <Card className="shadow-xl border-0">
-                  <CardHeader className="bg-gradient-primary text-white">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Review Comments
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <p className="text-gray-700">{trackingResult.data.review_comments}</p>
-                  </CardContent>
-                </Card>
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <h4 className="font-semibold text-yellow-800 text-sm mb-1">📝 Comments</h4>
+                  <p className="text-xs text-yellow-700">{trackingResult.data.review_comments}</p>
+                </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* No Results */}
+        {/* No Results - Compact */}
         {trackingResult && !trackingResult.success && (
           <Card className="shadow-xl border-0">
-            <CardContent className="text-center py-12">
-              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Application Not Found</h3>
-              <p className="text-gray-600">
+            <CardContent className="text-center py-8">
+              <AlertCircle className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+              <h3 className="text-base font-medium text-gray-900 mb-1">Application Not Found</h3>
+              <p className="text-sm text-gray-600">
                 No application found with reference ID: {trackingId}
               </p>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-xs text-gray-500 mt-1">
                 Please check your reference ID and try again.
               </p>
             </CardContent>
@@ -479,109 +620,122 @@ export default function TrackingPage() {
         )}
       </div>
 
-      {/* Payment Modal */}
+      {/* Compact Payment Modal */}
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <CheckCircle className="w-4 h-4 text-green-600" />
               Fee Payment Details
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               Review your fee structure and proceed with payment
             </DialogDescription>
           </DialogHeader>
           
           {paymentInfo && (
-            <div className="space-y-6">
-              {/* School and Course Info */}
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-700 mb-2">Enrollment Details</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-4">
+              {/* School and Course Info - Compact */}
+              <div className="p-3 bg-blue-50 rounded-md">
+                <h4 className="font-medium text-blue-700 mb-2 text-sm">Enrollment Details</h4>
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-gray-600">School:</span>
-                    <p className="font-medium">{paymentInfo.school_name}</p>
+                    <p className="font-medium truncate">{paymentInfo.school_name}</p>
                   </div>
                   <div>
                     <span className="text-gray-600">Course:</span>
-                    <p className="font-medium">{paymentInfo.course}</p>
+                    <p className="font-medium truncate">{paymentInfo.course_applied || 'N/A'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Reference ID:</span>
-                    <p className="font-mono font-medium">{paymentInfo.reference_id}</p>
+                    <span className="text-gray-600">Reference:</span>
+                    <p className="font-mono font-medium text-xs">{paymentInfo.reference_id}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Due Date:</span>
-                    <p className="font-medium">{new Date(paymentInfo.due_date).toLocaleDateString()}</p>
+                    <span className="text-gray-600">Category:</span>
+                    <p className="font-medium">{paymentInfo.category?.toUpperCase() || 'N/A'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Fee Breakdown */}
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium mb-4">Fee Breakdown</h4>
-                <div className="space-y-3">
+              {/* Fee Breakdown - Compact */}
+              <div className="p-3 border rounded-md">
+                <h4 className="font-medium mb-3 text-sm">Fee Structure</h4>
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Tuition Fee:</span>
-                    <span>₹{paymentInfo.fee_structure.tuition_fee}</span>
+                    <span>Class Range:</span>
+                    <span className="font-medium">{paymentInfo.fee_structure?.class_range}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Library Fee:</span>
-                    <span>₹{paymentInfo.fee_structure.library_fee}</span>
+                    <span>Category:</span>
+                    <span className="font-medium">{paymentInfo.fee_structure?.category?.replace('_', '/').toUpperCase()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Lab Fee:</span>
-                    <span>₹{paymentInfo.fee_structure.lab_fee}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Exam Fee:</span>
-                    <span>₹{paymentInfo.fee_structure.exam_fee}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Admission Fee:</span>
-                    <span>₹{paymentInfo.fee_structure.admission_fee}</span>
-                  </div>
+                  {paymentInfo.fee_structure?.annual_fee_min !== paymentInfo.fee_structure?.annual_fee_max ? (
+                    <div className="flex justify-between">
+                      <span>Fee Range:</span>
+                      <span>₹{paymentInfo.fee_structure?.annual_fee_min} - ₹{paymentInfo.fee_structure?.annual_fee_max}</span>
+                    </div>
+                  ) : null}
                   <hr />
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total Amount:</span>
-                    <span className="text-green-600">₹{paymentInfo.fee_structure.total_fee}</span>
+                  <div className="flex justify-between font-bold">
+                    <span>Annual Fee:</span>
+                    <span className="text-green-600">₹{paymentInfo.fee_structure?.total_fee || 0}</span>
                   </div>
+                  {paymentInfo.fee_structure?.total_fee === 0 && (
+                    <div className="text-center p-2 bg-green-50 rounded-md">
+                      <p className="text-green-700 font-medium text-sm">🎉 Free Education!</p>
+                      <p className="text-xs text-green-600">No fee required for this class and category</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Payment Methods */}
-              <div className="space-y-4">
-                <h4 className="font-medium">Select Payment Method</h4>
-                <div className="grid grid-cols-1 gap-3">
-                  {paymentInfo.payment_methods.map((method: string, index: number) => (
+              {/* Payment Methods - Compact */}
+              {paymentInfo.fee_structure?.total_fee > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Select Payment Method</h4>
+                  <div className="grid grid-cols-1 gap-2">
                     <Button
-                      key={index}
                       variant="outline"
-                      className="justify-start h-auto p-4"
-                      onClick={() => handlePaymentMethod(method)}
+                      className="justify-start h-auto p-3 text-left"
+                      onClick={() => handlePaymentMethod('online')}
                     >
-                      <div className="text-left">
-                        <p className="font-medium">
-                          {method === 'online' && '💳 Online Payment'}
-                          {method === 'card' && '💳 Credit/Debit Card'}
-                          {method === 'bank_transfer' && '🏦 Bank Transfer'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {method === 'online' && 'Pay securely using UPI, Net Banking, or Cards'}
-                          {method === 'card' && 'Direct card payment with instant confirmation'}
-                          {method === 'bank_transfer' && 'Transfer directly to school account'}
-                        </p>
+                      <div>
+                        <p className="font-medium text-sm">💳 Online Payment</p>
+                        <p className="text-xs text-gray-500">Pay securely using UPI, Net Banking, or Cards</p>
                       </div>
                     </Button>
-                  ))}
+                    <Button
+                      variant="outline"
+                      className="justify-start h-auto p-3 text-left"
+                      onClick={() => handlePaymentMethod('bank_transfer')}
+                    >
+                      <div>
+                        <p className="font-medium text-sm">🏦 Bank Transfer</p>
+                        <p className="text-xs text-gray-500">Transfer directly to school account</p>
+                      </div>
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Enrollment Confirmation</h4>
+                  <Button
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                    onClick={() => handlePaymentMethod('free_enrollment')}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Confirm Free Enrollment
+                  </Button>
+                </div>
+              )}
 
-              {/* Terms */}
-              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
-                <p><strong>Note:</strong> Payment is required to confirm your enrollment. 
-                Once payment is completed, you will receive a confirmation receipt and 
-                further enrollment instructions via email.</p>
+              {/* Terms - Compact */}
+              <div className="p-2 bg-gray-50 rounded-md text-xs text-gray-600">
+                <p><strong>Note:</strong> {paymentInfo.fee_structure?.total_fee > 0 
+                  ? 'Payment is required to confirm enrollment. You will receive confirmation and instructions via email.'
+                  : 'Click "Confirm Free Enrollment" to complete your admission. You will receive confirmation via email.'
+                }</p>
               </div>
             </div>
           )}

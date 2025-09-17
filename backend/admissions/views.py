@@ -585,3 +585,300 @@ class DocumentUploadAPIView(APIView):
                 'success': False,
                 'message': 'Application not found'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+class FeeCalculationAPIView(APIView):
+    """API view for calculating fee based on student's course and category"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        reference_id = request.data.get('reference_id')
+        
+        if not reference_id:
+            return Response({
+                'success': False,
+                'message': 'Reference ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get the admission application
+            application = AdmissionApplication.objects.get(reference_id=reference_id)
+            
+            # Import FeeStructure here to avoid circular imports
+            from .models import FeeStructure
+            
+            # Get fee structure for the student
+            fee_structure = FeeStructure.get_fee_for_student(
+                application.course_applied, 
+                application.category
+            )
+            
+            if not fee_structure:
+                return Response({
+                    'success': False,
+                    'message': 'Fee structure not found for this course and category'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Calculate total fee (use minimum fee for display)
+            total_fee = fee_structure.annual_fee_min
+            
+            # Get school decisions for this application
+            school_decisions = SchoolAdmissionDecision.objects.filter(
+                application=application,
+                decision='accepted'
+            ).select_related('school')
+            
+            response_data = {
+                'success': True,
+                'data': {
+                    'reference_id': reference_id,
+                    'applicant_name': application.applicant_name,
+                    'course_applied': application.course_applied,
+                    'category': application.category,
+                    'fee_structure': {
+                        'class_range': fee_structure.class_range,
+                        'category': fee_structure.category,
+                        'annual_fee_min': float(fee_structure.annual_fee_min),
+                        'annual_fee_max': float(fee_structure.annual_fee_max) if fee_structure.annual_fee_max else float(fee_structure.annual_fee_min),
+                        'total_fee': float(total_fee)
+                    },
+                    'accepted_schools': [{
+                        'id': decision.id,
+                        'school_name': decision.school.school_name,
+                        'preference_order': decision.preference_order
+                    } for decision in school_decisions]
+                }
+            }
+            
+            return Response(response_data)
+            
+        except AdmissionApplication.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Application not found with this reference ID'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error calculating fee: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class EnrollmentAPIView(APIView):
+    """API view for enrolling students in schools"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Enroll student in a specific school"""
+        try:
+            decision_id = request.data.get('decision_id')
+            payment_reference = request.data.get('payment_reference', '')
+            
+            if not decision_id:
+                return Response({
+                    'success': False,
+                    'message': 'Decision ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the school decision
+            try:
+                decision = SchoolAdmissionDecision.objects.get(id=decision_id)
+            except SchoolAdmissionDecision.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'School decision not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if student can enroll
+            if not decision.can_enroll():
+                # Check specific reasons for inability to enroll
+                if decision.decision != 'accepted':
+                    return Response({
+                        'success': False,
+                        'message': 'Cannot enroll: Application not accepted'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif decision.enrollment_status != 'not_enrolled':
+                    return Response({
+                        'success': False,
+                        'message': 'Cannot enroll: Already enrolled or withdrawn'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif decision.application.has_active_enrollment():
+                    active_enrollment = decision.application.get_active_enrollment()
+                    return Response({
+                        'success': False,
+                        'message': f'Cannot enroll: Already enrolled at {active_enrollment.school.school_name}. Withdraw first to enroll elsewhere.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'success': False,
+                        'message': 'Cannot enroll: Unknown restriction'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Enroll the student
+            decision.enroll_student(payment_reference=payment_reference)
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully enrolled at {decision.school.school_name}',
+                'data': {
+                    'enrollment_date': decision.enrollment_date,
+                    'school_name': decision.school.school_name,
+                    'enrollment_status': decision.enrollment_status,
+                    'payment_reference': decision.payment_reference
+                }
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error during enrollment: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WithdrawalAPIView(APIView):
+    """API view for withdrawing student enrollment"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Withdraw student enrollment from a school"""
+        try:
+            decision_id = request.data.get('decision_id')
+            withdrawal_reason = request.data.get('withdrawal_reason', '')
+            
+            if not decision_id:
+                return Response({
+                    'success': False,
+                    'message': 'Decision ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the school decision
+            try:
+                decision = SchoolAdmissionDecision.objects.get(id=decision_id)
+            except SchoolAdmissionDecision.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'School decision not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if student can withdraw
+            if not decision.can_withdraw():
+                return Response({
+                    'success': False,
+                    'message': 'Cannot withdraw: Not currently enrolled'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Withdraw the enrollment
+            decision.withdraw_enrollment(reason=withdrawal_reason)
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully withdrawn from {decision.school.school_name}',
+                'data': {
+                    'withdrawal_date': decision.withdrawal_date,
+                    'school_name': decision.school.school_name,
+                    'enrollment_status': decision.enrollment_status,
+                    'withdrawal_reason': decision.withdrawal_reason
+                }
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error during withdrawal: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminDashboardAPIView(APIView):
+    """API view for admin dashboard admissions data"""
+    permission_classes = [AllowAny]  # Change to IsAuthenticated in production
+    
+    def get(self, request):
+        """Get admission statistics and recent applications for admin dashboard"""
+        try:
+            # Get admission statistics
+            total_applications = AdmissionApplication.objects.count()
+            pending_applications = AdmissionApplication.objects.filter(status='pending').count()
+            approved_applications = AdmissionApplication.objects.filter(status='approved').count()
+            rejected_applications = AdmissionApplication.objects.filter(status='rejected').count()
+            
+            # Get enrollment statistics
+            total_decisions = SchoolAdmissionDecision.objects.count()
+            enrolled_students = SchoolAdmissionDecision.objects.filter(enrollment_status='enrolled').count()
+            withdrawn_students = SchoolAdmissionDecision.objects.filter(enrollment_status='withdrawn').count()
+            accepted_decisions = SchoolAdmissionDecision.objects.filter(decision='accepted').count()
+            pending_decisions = SchoolAdmissionDecision.objects.filter(decision='pending').count()
+            
+            # Get recent applications (last 10)
+            recent_applications = AdmissionApplication.objects.select_related(
+                'first_preference_school', 'second_preference_school', 'third_preference_school'
+            ).prefetch_related('school_decisions__school').order_by('-application_date')[:10]
+            
+            recent_applications_data = []
+            for app in recent_applications:
+                # Get enrollment status
+                enrollment_status = "NOT_ENROLLED"
+                enrolled_school = None
+                
+                enrolled_decision = app.school_decisions.filter(enrollment_status='enrolled').first()
+                if enrolled_decision:
+                    enrollment_status = "ENROLLED"
+                    enrolled_school = enrolled_decision.school.school_name
+                elif app.school_decisions.filter(enrollment_status='withdrawn').exists():
+                    enrollment_status = "WITHDRAWN"
+                
+                # Get accepted schools count
+                accepted_count = app.school_decisions.filter(decision='accepted').count()
+                
+                recent_applications_data.append({
+                    'reference_id': app.reference_id,
+                    'applicant_name': app.applicant_name,
+                    'email': app.email,
+                    'course_applied': app.course_applied,
+                    'application_date': app.application_date,
+                    'status': app.status,
+                    'first_preference_school': app.first_preference_school.school_name if app.first_preference_school else None,
+                    'enrollment_status': enrollment_status,
+                    'enrolled_school': enrolled_school,
+                    'accepted_schools_count': accepted_count,
+                })
+            
+            # Get pending reviews (applications needing attention)
+            pending_reviews = SchoolAdmissionDecision.objects.filter(
+                decision='pending'
+            ).select_related('application', 'school').order_by('-application__application_date')[:5]
+            
+            pending_reviews_data = []
+            for decision in pending_reviews:
+                pending_reviews_data.append({
+                    'reference_id': decision.application.reference_id,
+                    'applicant_name': decision.application.applicant_name,
+                    'school_name': decision.school.school_name,
+                    'preference_order': decision.preference_order,
+                    'application_date': decision.application.application_date,
+                    'course_applied': decision.application.course_applied,
+                })
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'statistics': {
+                        'total_applications': total_applications,
+                        'pending_applications': pending_applications,
+                        'approved_applications': approved_applications,
+                        'rejected_applications': rejected_applications,
+                        'total_decisions': total_decisions,
+                        'enrolled_students': enrolled_students,
+                        'withdrawn_students': withdrawn_students,
+                        'accepted_decisions': accepted_decisions,
+                        'pending_decisions': pending_decisions,
+                    },
+                    'recent_applications': recent_applications_data,
+                    'pending_reviews': pending_reviews_data,
+                }
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error fetching dashboard data: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -91,6 +91,18 @@ export const admissionService = {
   // Initialize fee payment process
   initializeFeePayment: (data: { reference_id: string; school_decision_id?: number }): Promise<ApiResponse<any>> =>
     api.post('admissions/fee-payment/init/', data),
+
+  // Calculate fee based on student's course and category
+  calculateFee: (data: { reference_id: string }): Promise<ApiResponse<any>> =>
+    api.post('admissions/fee-calculation/', data),
+
+  // Enroll student in a school
+  enrollStudent: (data: { decision_id: number; payment_reference?: string }): Promise<ApiResponse<any>> =>
+    api.post('admissions/enroll/', data),
+
+  // Withdraw student enrollment
+  withdrawEnrollment: (data: { decision_id: number; withdrawal_reason?: string }): Promise<ApiResponse<any>> =>
+    api.post('admissions/withdraw/', data),
 };
 
 export const feeService = {

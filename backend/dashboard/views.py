@@ -68,6 +68,9 @@ class AdminDashboardAPIView(APIView):
         user_school = getattr(request.user, 'school', None)
         school_filter = {'school': user_school} if user_school else {}
         
+        # Import here to avoid circular imports
+        from admissions.models import SchoolAdmissionDecision
+        
         # Student statistics
         students_data = {
             'total': StudentProfile.objects.filter(**school_filter).count(),
@@ -91,22 +94,88 @@ class AdminDashboardAPIView(APIView):
         
         # Application data
         applications_data = {
-            'pending': AdmissionApplication.objects.filter(**school_filter, status='pending').count(),
-            'approved': AdmissionApplication.objects.filter(**school_filter, status='approved').count(),
-            'rejected': AdmissionApplication.objects.filter(**school_filter, status='rejected').count()
+            'pending': AdmissionApplication.objects.filter(status='pending').count(),
+            'approved': AdmissionApplication.objects.filter(status='approved').count(),
+            'rejected': AdmissionApplication.objects.filter(status='rejected').count(),
+            'total': AdmissionApplication.objects.count()
         }
         
-        # Recent activity
-        recent_applications = AdmissionApplication.objects.filter(
-            **school_filter,
-            application_date__gte=timezone.now() - timedelta(days=7)
-        ).count()
+        # Enrollment statistics
+        enrollment_data = {
+            'enrolled': SchoolAdmissionDecision.objects.filter(enrollment_status='enrolled').count(),
+            'withdrawn': SchoolAdmissionDecision.objects.filter(enrollment_status='withdrawn').count(),
+            'accepted_not_enrolled': SchoolAdmissionDecision.objects.filter(
+                decision='accepted', enrollment_status='not_enrolled'
+            ).count(),
+            'pending_decisions': SchoolAdmissionDecision.objects.filter(decision='pending').count()
+        }
+        
+        # Recent applications (last 10)
+        recent_applications = AdmissionApplication.objects.select_related(
+            'first_preference_school', 'second_preference_school', 'third_preference_school'
+        ).prefetch_related('school_decisions__school').order_by('-application_date')[:10]
+        
+        recent_applications_data = []
+        for app in recent_applications:
+            # Get enrollment status
+            enrollment_status = "NOT_ENROLLED"
+            enrolled_school = None
+            
+            enrolled_decision = app.school_decisions.filter(enrollment_status='enrolled').first()
+            if enrolled_decision:
+                enrollment_status = "ENROLLED"
+                enrolled_school = enrolled_decision.school.school_name
+            elif app.school_decisions.filter(enrollment_status='withdrawn').exists():
+                enrollment_status = "WITHDRAWN"
+            
+            # Get accepted schools count
+            accepted_count = app.school_decisions.filter(decision='accepted').count()
+            pending_count = app.school_decisions.filter(decision='pending').count()
+            
+            recent_applications_data.append({
+                'id': app.id,
+                'reference_id': app.reference_id,
+                'applicant_name': app.applicant_name,
+                'email': app.email,
+                'phone_number': app.phone_number,
+                'course_applied': app.course_applied,
+                'category': app.category,
+                'application_date': app.application_date,
+                'status': app.status,
+                'first_preference_school': app.first_preference_school.school_name if app.first_preference_school else None,
+                'enrollment_status': enrollment_status,
+                'enrolled_school': enrolled_school,
+                'accepted_schools_count': accepted_count,
+                'pending_schools_count': pending_count,
+            })
+        
+        # Pending reviews (applications needing attention)
+        pending_reviews = SchoolAdmissionDecision.objects.filter(
+            decision='pending'
+        ).select_related('application', 'school').order_by('-application__application_date')[:10]
+        
+        pending_reviews_data = []
+        for decision in pending_reviews:
+            pending_reviews_data.append({
+                'id': decision.id,
+                'reference_id': decision.application.reference_id,
+                'applicant_name': decision.application.applicant_name,
+                'school_name': decision.school.school_name,
+                'preference_order': decision.preference_order,
+                'application_date': decision.application.application_date,
+                'course_applied': decision.application.course_applied,
+                'category': decision.application.category,
+                'phone_number': decision.application.phone_number,
+                'email': decision.application.email,
+            })
 
         return Response({
             'students': students_data,
             'fees': fees_data,
             'applications': applications_data,
-            'recent_applications': recent_applications,
+            'enrollment': enrollment_data,
+            'recent_applications': recent_applications_data,
+            'pending_reviews': pending_reviews_data,
             'timestamp': timezone.now()
         })
 

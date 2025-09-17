@@ -23,6 +23,7 @@ interface AdmissionFormData {
   email: string;
   phone_number: string;
   address: string;
+  category: string;
   course_applied: string;
   first_preference_school: number | "";
   second_preference_school: number | "";
@@ -75,6 +76,7 @@ const Admission = () => {
     email: "",
     phone_number: "",
     address: "",
+    category: "general",
     course_applied: "",
     first_preference_school: "",
     second_preference_school: "",
@@ -373,6 +375,7 @@ const Admission = () => {
         formData.phone_number &&
         formData.email &&
         formData.address &&
+        formData.category &&
         isEmailVerified  // Email must be verified
       );
     }
@@ -424,6 +427,7 @@ const Admission = () => {
         email: formData.email,
         phone_number: formData.phone_number,
         address: formData.address,
+        category: formData.category,
         course_applied: formData.course_applied,
         first_preference_school: formData.first_preference_school === "" ? null : Number(formData.first_preference_school),
         second_preference_school: formData.second_preference_school === "" ? null : Number(formData.second_preference_school),
@@ -509,6 +513,7 @@ const Admission = () => {
                       email: "",
                       phone_number: "",
                       address: "",
+                      category: "general",
                       course_applied: "",
                       first_preference_school: "",
                       second_preference_school: "",
@@ -845,6 +850,21 @@ const Admission = () => {
                         required 
                         className="border-gray-300 focus:border-primary focus:ring-primary"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category" className="text-gray-700">Category *</Label>
+                      <Select onValueChange={(value) => handleInputChange('category', value)} value={formData.category} required>
+                        <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                          <SelectValue placeholder="Select your category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="sc">SC (Scheduled Caste)</SelectItem>
+                          <SelectItem value="st">ST (Scheduled Tribe)</SelectItem>
+                          <SelectItem value="obc">OBC (Other Backward Class)</SelectItem>
+                          <SelectItem value="sbc">SBC (Special Backward Class)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

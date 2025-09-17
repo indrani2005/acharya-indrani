@@ -1,7 +1,40 @@
 from django.contrib import admin
-
-from django.contrib import admin
 from .models import AdmissionApplication, EmailVerification, SchoolAdmissionDecision
+
+
+class SchoolAdmissionDecisionInline(admin.TabularInline):
+    """Inline for displaying school decisions in the application detail view"""
+    model = SchoolAdmissionDecision
+    extra = 0
+    readonly_fields = ['decision_date', 'student_choice_date', 'enrollment_date', 'withdrawal_date', 'get_status_display']
+    fields = ['school', 'preference_order', 'decision', 'get_status_display', 'enrollment_status', 'reviewed_by', 'review_comments']
+    
+    def get_status_display(self, obj):
+        """Display comprehensive status for inline"""
+        if obj.enrollment_status == 'enrolled':
+            date_str = obj.enrollment_date.strftime('%m/%d/%y') if obj.enrollment_date else 'Unknown'
+            return f"ENROLLED ({date_str})"
+        elif obj.enrollment_status == 'withdrawn':
+            date_str = obj.withdrawal_date.strftime('%m/%d/%y') if obj.withdrawal_date else 'Unknown'
+            return f"WITHDRAWN ({date_str})"
+        elif obj.decision == 'accepted':
+            return "ACCEPTED - NOT ENROLLED"
+        elif obj.decision == 'rejected':
+            return "REJECTED"
+        elif obj.decision == 'waitlisted':
+            return "WAITLISTED"
+        else:
+            return "PENDING REVIEW"
+    
+    get_status_display.short_description = 'Current Status'
+    
+    def has_add_permission(self, request, obj=None):
+        """Prevent adding new decisions via inline - they're auto-created"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting decisions via inline"""
+        return False
 
 @admin.register(EmailVerification)
 class EmailVerificationAdmin(admin.ModelAdmin):
@@ -33,7 +66,7 @@ class AdmissionApplicationAdmin(admin.ModelAdmin):
     
     list_display = [
         'reference_id', 'applicant_name', 'course_applied', 'first_preference_school', 
-        'email', 'status', 'application_date', 'reviewed_by'
+        'email', 'status', 'get_enrollment_status', 'application_date', 'reviewed_by'
     ]
     list_filter = ['status', 'course_applied', 'first_preference_school', 'application_date']
     search_fields = [
@@ -42,6 +75,27 @@ class AdmissionApplicationAdmin(admin.ModelAdmin):
         'third_preference_school__school_name'
     ]
     readonly_fields = ['application_date', 'email_verification']
+    inlines = [SchoolAdmissionDecisionInline]
+    
+    def get_enrollment_status(self, obj):
+        """Display enrollment status summary with color coding"""
+        enrolled_decisions = obj.school_decisions.filter(enrollment_status='enrolled')
+        if enrolled_decisions.exists():
+            schools = [decision.school.school_name for decision in enrolled_decisions]
+            return f"ENROLLED at {', '.join(schools)}"
+        
+        withdrawn_decisions = obj.school_decisions.filter(enrollment_status='withdrawn')
+        if withdrawn_decisions.exists():
+            schools = [decision.school.school_name for decision in withdrawn_decisions]
+            return f"WITHDRAWN from {', '.join(schools)}"
+        
+        accepted_decisions = obj.school_decisions.filter(decision='accepted')
+        if accepted_decisions.exists():
+            return f"{accepted_decisions.count()} SCHOOL(S) ACCEPTED - NOT ENROLLED YET"
+        
+        return "NO ACCEPTANCES YET"
+    
+    get_enrollment_status.short_description = 'Enrollment Status'
     
     fieldsets = (
         ('Application Reference', {
@@ -73,15 +127,57 @@ class SchoolAdmissionDecisionAdmin(admin.ModelAdmin):
     """Admin configuration for SchoolAdmissionDecision"""
     
     list_display = [
-        'application', 'school', 'preference_order', 'decision', 
-        'decision_date', 'reviewed_by', 'is_student_choice'
+        'get_application_info', 'school', 'preference_order', 'get_decision_status', 
+        'get_enrollment_display', 'decision_date', 'enrollment_date', 'reviewed_by'
     ]
-    list_filter = ['decision', 'preference_order', 'school', 'decision_date', 'is_student_choice']
+    list_filter = [
+        'decision', 'enrollment_status', 'preference_order', 'school', 
+        'decision_date', 'enrollment_date', 'is_student_choice'
+    ]
     search_fields = [
         'application__applicant_name', 'application__reference_id', 
         'school__school_name', 'application__email'
     ]
-    readonly_fields = ['decision_date', 'student_choice_date']
+    readonly_fields = ['decision_date', 'student_choice_date', 'enrollment_date', 'withdrawal_date']
+    
+    def get_application_info(self, obj):
+        """Show application info with reference ID"""
+        return f"{obj.application.applicant_name} ({obj.application.reference_id})"
+    
+    get_application_info.short_description = 'Student (Ref ID)'
+    
+    def get_decision_status(self, obj):
+        """Enhanced decision status display"""
+        return f"{obj.decision.upper()}"
+    
+    get_decision_status.short_description = 'Decision Status'
+    
+    def get_enrollment_display(self, obj):
+        """Enhanced enrollment status display"""
+        if obj.enrollment_status == 'enrolled':
+            date_str = obj.enrollment_date.strftime('%m/%d/%y') if obj.enrollment_date else 'Unknown'
+            return f"ENROLLED ({date_str})"
+        elif obj.enrollment_status == 'withdrawn':
+            date_str = obj.withdrawal_date.strftime('%m/%d/%y') if obj.withdrawal_date else 'Unknown'
+            return f"WITHDRAWN ({date_str})"
+        elif obj.decision == 'accepted':
+            return "ACCEPTED - NOT ENROLLED"
+        else:
+            return f"{obj.enrollment_status.upper().replace('_', ' ')}"
+    
+    get_enrollment_display.short_description = 'Enrollment Status'
+    
+    def save_model(self, request, obj, form, change):
+        """Custom save with validation and auto-setting reviewed_by"""
+        if not obj.reviewed_by:
+            obj.reviewed_by = request.user
+        
+        try:
+            super().save_model(request, obj, form, change)
+        except Exception as e:
+            from django.contrib import messages
+            messages.error(request, f"Error saving: {str(e)}")
+            raise
     
     fieldsets = (
         ('Application Info', {
@@ -93,4 +189,19 @@ class SchoolAdmissionDecisionAdmin(admin.ModelAdmin):
         ('Student Choice', {
             'fields': ('is_student_choice', 'student_choice_date')
         }),
+        ('Enrollment Management', {
+            'fields': (
+                'enrollment_status', 'enrollment_date', 'withdrawal_date', 
+                'withdrawal_reason'
+            ),
+            'description': 'Enrollment status changes automatically based on student actions. Manual changes should be made carefully.'
+        }),
+        ('Payment Information', {
+            'fields': ('payment_status', 'payment_reference'),
+            'classes': ('collapse',)
+        }),
     )
+
+    def get_queryset(self, request):
+        """Optimize queryset with related objects"""
+        return super().get_queryset(request).select_related('application', 'school', 'reviewed_by')

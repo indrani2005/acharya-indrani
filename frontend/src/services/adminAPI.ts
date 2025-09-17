@@ -139,6 +139,17 @@ export const adminAPI = {
     }
   },
 
+  // Get unified admin dashboard data (new endpoint)
+  getAdminDashboardData: async () => {
+    try {
+      const response = await apiClient.get('/dashboard/admin/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching admin dashboard data:', error);
+      throw error;
+    }
+  },
+
   // Get all students
   getStudents: async (): Promise<Student[]> => {
     try {

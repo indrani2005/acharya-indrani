@@ -83,6 +83,14 @@ class AdmissionApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
     
+    CATEGORY_CHOICES = [
+        ('general', 'General'),
+        ('sc', 'SC (Scheduled Caste)'),
+        ('st', 'ST (Scheduled Tribe)'),
+        ('obc', 'OBC (Other Backward Class)'),
+        ('sbc', 'SBC (Special Backward Class)'),
+    ]
+    
     # Reference ID for tracking
     reference_id = models.CharField(max_length=20, unique=True, blank=True, db_index=True)
     
@@ -100,6 +108,7 @@ class AdmissionApplication(models.Model):
     email = models.EmailField()
     phone_number = models.CharField(max_length=15)
     address = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
     
     # Academic Information
     course_applied = models.CharField(max_length=100)
@@ -192,6 +201,14 @@ class AdmissionApplication(models.Model):
         if self.third_preference_school:
             preferences.append(('3rd', self.third_preference_school))
         return preferences
+    
+    def has_active_enrollment(self):
+        """Check if student has active enrollment in any school"""
+        return self.school_decisions.filter(enrollment_status='enrolled').exists()
+    
+    def get_active_enrollment(self):
+        """Get the active enrollment if any"""
+        return self.school_decisions.filter(enrollment_status='enrolled').first()
 
 
 class SchoolAdmissionDecision(models.Model):
@@ -203,6 +220,12 @@ class SchoolAdmissionDecision(models.Model):
         ('accepted', 'Accepted'),
         ('rejected', 'Rejected'),
         ('waitlisted', 'Waitlisted'),
+    ]
+    
+    ENROLLMENT_STATUS_CHOICES = [
+        ('not_enrolled', 'Not Enrolled'),
+        ('enrolled', 'Enrolled'),
+        ('withdrawn', 'Withdrawn'),
     ]
     
     application = models.ForeignKey(AdmissionApplication, on_delete=models.CASCADE, related_name='school_decisions')
@@ -221,20 +244,171 @@ class SchoolAdmissionDecision(models.Model):
     is_student_choice = models.BooleanField(default=False)  # True if student chose this school among accepted ones
     student_choice_date = models.DateTimeField(null=True, blank=True)
     
+    # New enrollment tracking fields
+    enrollment_status = models.CharField(max_length=20, choices=ENROLLMENT_STATUS_CHOICES, default='not_enrolled')
+    enrollment_date = models.DateTimeField(null=True, blank=True)
+    withdrawal_date = models.DateTimeField(null=True, blank=True)
+    withdrawal_reason = models.TextField(blank=True)
+    payment_status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'Payment Pending'),
+        ('completed', 'Payment Completed'),
+        ('failed', 'Payment Failed'),
+        ('waived', 'Payment Waived'),
+    ])
+    payment_reference = models.CharField(max_length=100, blank=True)
+    
     class Meta:
         unique_together = ['application', 'school']
         indexes = [
             models.Index(fields=['school', 'decision']),
             models.Index(fields=['application', 'decision']),
             models.Index(fields=['decision', 'decision_date']),
+            models.Index(fields=['enrollment_status', 'enrollment_date']),
+            models.Index(fields=['application', 'enrollment_status']),
         ]
         ordering = ['preference_order', '-decision_date']
     
     def save(self, *args, **kwargs):
-        """Set decision date when decision is made"""
+        """Set decision date when decision is made and validate admin changes"""
+        from django.core.exceptions import ValidationError
+        
+        # Prevent rejecting enrolled students
+        if self.pk:  # Only for updates, not new records
+            old_instance = SchoolAdmissionDecision.objects.get(pk=self.pk)
+            if old_instance.enrollment_status == 'enrolled' and self.decision == 'rejected':
+                raise ValidationError("Cannot reject a student who is already enrolled. Withdraw enrollment first.")
+        
         if self.decision != 'pending' and not self.decision_date:
             self.decision_date = timezone.now()
+        
+        # Set enrollment date when enrolling
+        if self.enrollment_status == 'enrolled' and not self.enrollment_date:
+            self.enrollment_date = timezone.now()
+            self.is_student_choice = True
+            self.student_choice_date = timezone.now()
+        
+        # Set withdrawal date when withdrawing
+        if self.enrollment_status == 'withdrawn' and not self.withdrawal_date:
+            self.withdrawal_date = timezone.now()
+            
         super().save(*args, **kwargs)
     
+    def enroll_student(self, payment_reference=None):
+        """Enroll student in this school"""
+        self.enrollment_status = 'enrolled'
+        self.enrollment_date = timezone.now()
+        self.is_student_choice = True
+        self.student_choice_date = timezone.now()
+        if payment_reference:
+            self.payment_reference = payment_reference
+            self.payment_status = 'completed'
+        self.save()
+    
+    def withdraw_enrollment(self, reason=""):
+        """Withdraw enrollment from this school"""
+        self.enrollment_status = 'withdrawn'
+        self.withdrawal_date = timezone.now()
+        self.withdrawal_reason = reason
+        self.is_student_choice = False
+        self.save()
+    
+    def can_enroll(self):
+        """Check if student can enroll (decision is accepted and not already enrolled)"""
+        if self.decision != 'accepted':
+            return False
+        
+        if self.enrollment_status == 'enrolled':
+            return False
+        
+        # Allow enrollment after withdrawal
+        if self.enrollment_status == 'withdrawn':
+            # Check if student has any OTHER active enrollment
+            return not self.application.school_decisions.filter(
+                enrollment_status='enrolled'
+            ).exclude(id=self.id).exists()
+        
+        # For not_enrolled status, check if student has any active enrollment elsewhere
+        if self.enrollment_status == 'not_enrolled':
+            return not self.application.has_active_enrollment()
+        
+        return False
+    
+    def has_active_enrollment_elsewhere(self):
+        """Check if student has active enrollment in any other school"""
+        return self.application.school_decisions.filter(
+            enrollment_status='enrolled'
+        ).exclude(id=self.id).exists()
+    
+    def can_withdraw(self):
+        """Check if student can withdraw (must be currently enrolled)"""
+        return self.enrollment_status == 'enrolled'
+    
     def __str__(self):
-        return f"{self.application.applicant_name} - {self.school.school_name} ({self.decision})"
+        status_display = f"{self.decision}"
+        if self.enrollment_status == 'enrolled':
+            status_display += " - ENROLLED"
+        elif self.enrollment_status == 'withdrawn':
+            status_display += " - WITHDRAWN"
+        return f"{self.application.applicant_name} - {self.school.school_name} ({status_display})"
+
+
+class FeeStructure(models.Model):
+    """Model to store fee structure based on class and category"""
+    
+    CLASS_CHOICES = [
+        ('1-8', 'Class 1-8'),
+        ('9-10', 'Class 9-10'),
+        ('11-12', 'Class 11-12'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('general', 'General'),
+        ('sc_st_obc_sbc', 'SC/ST/OBC/SBC'),
+    ]
+    
+    class_range = models.CharField(max_length=10, choices=CLASS_CHOICES)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    annual_fee_min = models.DecimalField(max_digits=10, decimal_places=2)
+    annual_fee_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['class_range', 'category']
+        ordering = ['class_range', 'category']
+    
+    def __str__(self):
+        if self.annual_fee_max and self.annual_fee_max != self.annual_fee_min:
+            return f"{self.class_range} - {self.category}: ₹{self.annual_fee_min} - ₹{self.annual_fee_max}"
+        else:
+            return f"{self.class_range} - {self.category}: ₹{self.annual_fee_min}"
+    
+    @classmethod
+    def get_fee_for_student(cls, course_applied, category):
+        """Calculate fee for a student based on their course and category"""
+        # Map course to class range
+        class_mapping = {
+            '1': '1-8', '2': '1-8', '3': '1-8', '4': '1-8', 
+            '5': '1-8', '6': '1-8', '7': '1-8', '8': '1-8',
+            '9': '9-10', '10': '9-10',
+            '11': '11-12', '12': '11-12'
+        }
+        
+        # Extract class number from course_applied
+        class_number = None
+        for key in class_mapping.keys():
+            if key in course_applied.lower():
+                class_number = key
+                break
+        
+        if not class_number:
+            return None
+        
+        class_range = class_mapping[class_number]
+        
+        # Map student category to fee category
+        fee_category = 'general' if category == 'general' else 'sc_st_obc_sbc'
+        
+        try:
+            fee_structure = cls.objects.get(class_range=class_range, category=fee_category)
+            return fee_structure
+        except cls.DoesNotExist:
+            return None

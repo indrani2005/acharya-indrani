@@ -35,7 +35,7 @@ class AdmissionApplicationCreateSerializer(serializers.ModelSerializer):
         model = AdmissionApplication
         fields = [
             'applicant_name', 'date_of_birth', 'email', 'phone_number',
-            'address', 'course_applied', 'first_preference_school', 
+            'address', 'category', 'course_applied', 'first_preference_school', 
             'second_preference_school', 'third_preference_school',
             'previous_school', 'last_percentage', 'documents',
             'email_verification_token'
@@ -85,11 +85,22 @@ class SchoolAdmissionDecisionSerializer(serializers.ModelSerializer):
     """Serializer for SchoolAdmissionDecision"""
     school = SchoolSerializer(read_only=True)
     application = serializers.StringRelatedField(read_only=True)
+    school_name = serializers.CharField(source='school.school_name', read_only=True)
+    can_enroll = serializers.SerializerMethodField()
+    can_withdraw = serializers.SerializerMethodField()
     
     class Meta:
         model = SchoolAdmissionDecision
         fields = '__all__'
-        read_only_fields = ['decision_date', 'student_choice_date']
+        read_only_fields = ['decision_date', 'student_choice_date', 'enrollment_date', 'withdrawal_date']
+    
+    def get_can_enroll(self, obj):
+        """Check if student can enroll in this school"""
+        return obj.can_enroll()
+    
+    def get_can_withdraw(self, obj):
+        """Check if student can withdraw from this school"""
+        return obj.can_withdraw()
 
 
 class AdmissionTrackingSerializer(serializers.ModelSerializer):
@@ -102,7 +113,7 @@ class AdmissionTrackingSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdmissionApplication
         fields = [
-            'reference_id', 'applicant_name', 'course_applied', 'status',
+            'reference_id', 'applicant_name', 'course_applied', 'category', 'status',
             'first_preference_school', 'second_preference_school', 'third_preference_school',
             'application_date', 'review_comments', 'school_decisions'
         ]
