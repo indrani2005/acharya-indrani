@@ -167,7 +167,7 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
           Upload & Extract Form Data
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden">
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
         <DialogHeader className="pb-4">
           <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -182,7 +182,7 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-y-auto">
           {/* Left Column - File Upload and Preview */}
           <div className="space-y-4">
             <Card className="border-2 border-dashed border-blue-200 hover:border-blue-300 transition-colors">
