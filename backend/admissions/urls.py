@@ -17,6 +17,7 @@ urlpatterns = [
     path('fee-payment/init/', views.FeePaymentInitAPIView.as_view(), name='init-fee-payment'),
     path('fee-calculation/', views.FeeCalculationAPIView.as_view(), name='fee-calculation'),
     path('documents/<int:application_id>/', views.DocumentUploadAPIView.as_view(), name='upload-documents'),
+    path('ocr-extract/', views.OCRFormExtractionAPIView.as_view(), name='ocr-form-extraction'),
     path('enroll/', views.EnrollmentAPIView.as_view(), name='enroll-student'),
     path('withdraw/', views.WithdrawalAPIView.as_view(), name='withdraw-student'),
     path('', include(router.urls)),

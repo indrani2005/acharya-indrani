@@ -1,4 +1,5 @@
 from django.shortcuts import render
+import logging
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -26,6 +27,9 @@ from .serializers import (
     AdmissionApplicationWithDecisionsSerializer
 )
 from .email_service import send_otp_email, send_admission_confirmation_email
+from .ocr_service import OCRService
+
+logger = logging.getLogger(__name__)
 
 
 class EmailVerificationRequestAPIView(APIView):
@@ -881,4 +885,72 @@ class AdminDashboardAPIView(APIView):
             return Response({
                 'success': False,
                 'message': f'Error fetching dashboard data: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class OCRFormExtractionAPIView(APIView):
+    """API view for extracting text from admission form images using OCR"""
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [AllowAny]  # Allow anyone to use OCR during application
+    
+    def post(self, request):
+        """Extract text from uploaded admission form image"""
+        try:
+            # Check if file is provided
+            if 'form_image' not in request.FILES:
+                return Response({
+                    'success': False,
+                    'message': 'No form image provided. Please upload an image file.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            uploaded_file = request.FILES['form_image']
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp']
+            if uploaded_file.content_type not in allowed_types:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid file type. Please upload a valid image file (JPEG, PNG, TIFF, BMP).'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate file size (max 10MB)
+            max_size = 10 * 1024 * 1024  # 10MB
+            if uploaded_file.size > max_size:
+                return Response({
+                    'success': False,
+                    'message': 'File size too large. Please upload an image smaller than 10MB.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Initialize OCR service
+            ocr_service = OCRService()
+            
+            # Extract and parse form data
+            result = ocr_service.extract_and_parse_form(uploaded_file)
+            
+            if result['success']:
+                return Response({
+                    'success': True,
+                    'message': result['message'],
+                    'data': {
+                        'extracted_text': result['extracted_text'],
+                        'form_data': result['form_data'],
+                        'confidence': result['confidence'],
+                        'extracted_fields_count': len(result['form_data'])
+                    }
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'message': result['message'],
+                    'data': {
+                        'extracted_text': result['extracted_text'],
+                        'form_data': result['form_data']
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error in OCR form extraction: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Error processing form image: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

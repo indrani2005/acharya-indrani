@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { admissionService, schoolService } from "@/lib/api/services";
 import { extractApiData, extractErrorMessage } from "@/lib/utils/apiHelpers";
 import { School, AdmissionTrackingResponse, SchoolAdmissionDecision } from "@/lib/api/types";
+import { OCRFormExtractor } from "@/components/OCRFormExtractor";
 
 interface AdmissionFormData {
   applicant_name: string;
@@ -407,6 +408,45 @@ const Admission = () => {
     }
   };
 
+  const handleOCRDataExtracted = (extractedData: Record<string, string>) => {
+    console.log("OCR Extracted Data:", extractedData);
+    
+    // Map extracted data to form fields
+    const updatedFormData = { ...formData };
+    
+    // Apply extracted data to form fields
+    Object.entries(extractedData).forEach(([key, value]) => {
+      console.log(`Mapping ${key}: ${value}`);
+      if (key in updatedFormData && value) {
+        (updatedFormData as any)[key] = value;
+        console.log(`Applied ${key} = ${value}`);
+      } else {
+        console.log(`Skipped ${key}: not in form or empty value`);
+      }
+    });
+    
+    console.log("Updated form data:", updatedFormData);
+    setFormData(updatedFormData);
+    
+    // Update date if extracted
+    if (extractedData.date_of_birth) {
+      try {
+        const date = new Date(extractedData.date_of_birth);
+        if (!isNaN(date.getTime())) {
+          setDate(date);
+          console.log("Date set:", date);
+        }
+      } catch (error) {
+        console.error("Error parsing extracted date:", error);
+      }
+    }
+    
+    toast({
+      title: "Form data applied!",
+      description: "The extracted data has been filled into the form fields. Please review and make any necessary corrections.",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -581,6 +621,21 @@ const Admission = () => {
               {step === 1 && (
                 <div className="space-y-4 max-h-[75vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Step 1: Personal & Contact Details</h3>
+                  
+                  {/* OCR Form Extractor */}
+                  <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Upload className="h-5 w-5 text-blue-600" />
+                      <h4 className="font-medium text-blue-800">Quick Fill with OCR</h4>
+                    </div>
+                    <p className="text-sm text-blue-700 mb-3">
+                      Upload a photo of your admission form to automatically extract and fill the form fields.
+                    </p>
+                    <OCRFormExtractor 
+                      onDataExtracted={handleOCRDataExtracted}
+                      disabled={isSubmitting}
+                    />
+                  </div>
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="applicant_name" className="text-gray-700">Full Name *</Label>

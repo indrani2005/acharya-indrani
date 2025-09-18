@@ -103,6 +103,20 @@ export const admissionService = {
   // Withdraw student enrollment
   withdrawEnrollment: (data: { decision_id: number; withdrawal_reason?: string }): Promise<ApiResponse<any>> =>
     api.post('admissions/withdraw/', data),
+
+  // Extract text from admission form image using OCR
+  extractFormData: async (formImage: File): Promise<ApiResponse<any>> => {
+    const formData = new FormData();
+    formData.append('form_image', formImage);
+    
+    const response = await apiClient.post('admissions/ocr-extract/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  },
 };
 
 export const feeService = {
