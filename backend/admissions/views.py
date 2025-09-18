@@ -906,11 +906,15 @@ class OCRFormExtractionAPIView(APIView):
             uploaded_file = request.FILES['form_image']
             
             # Validate file type
-            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp']
+            allowed_types = [
+                'image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp',
+                'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain'
+            ]
             if uploaded_file.content_type not in allowed_types:
                 return Response({
                     'success': False,
-                    'message': 'Invalid file type. Please upload a valid image file (JPEG, PNG, TIFF, BMP).'
+                    'message': 'Invalid file type. Please upload a valid file (Images: JPG, PNG, TIFF, BMP | Documents: PDF, DOC, DOCX, TXT).'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Validate file size (max 10MB)
@@ -918,7 +922,7 @@ class OCRFormExtractionAPIView(APIView):
             if uploaded_file.size > max_size:
                 return Response({
                     'success': False,
-                    'message': 'File size too large. Please upload an image smaller than 10MB.'
+                    'message': 'File size too large. Please upload a file smaller than 10MB.'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Initialize OCR service

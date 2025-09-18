@@ -41,11 +41,15 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp'];
+      const allowedTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp',
+        'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+      ];
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Invalid file type",
-          description: "Please upload a valid image file (JPEG, PNG, TIFF, BMP).",
+          description: "Please upload a valid file (Images: JPG, PNG, TIFF, BMP | Documents: PDF, DOC, DOCX, TXT).",
           variant: "destructive",
         });
         return;
@@ -56,7 +60,7 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
       if (file.size > maxSize) {
         toast({
           title: "File too large",
-          description: "Please upload an image smaller than 10MB.",
+          description: "Please upload a file smaller than 10MB.",
           variant: "destructive",
         });
         return;
@@ -195,7 +199,7 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
                     <Input
                       id="form-image"
                       type="file"
-                      accept="image/*,.pdf,.doc,.docx,.txt"
+                      accept="image/*,application/pdf,.doc,.docx,.txt"
                       onChange={handleFileSelect}
                       ref={fileInputRef}
                       disabled={isProcessing}
@@ -236,11 +240,19 @@ export const OCRFormExtractor: React.FC<OCRFormExtractorProps> = ({
                   <div className="space-y-3">
                     <Label className="text-base font-medium">Document Preview</Label>
                     <div className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                      <img
-                        src={previewUrl}
-                        alt="Document preview"
-                        className="max-w-full h-auto object-contain mx-auto shadow-sm rounded"
-                      />
+                      {selectedFile?.type === 'application/pdf' ? (
+                        <iframe
+                          src={previewUrl}
+                          className="w-full h-64 border-0 rounded"
+                          title="PDF Preview"
+                        />
+                      ) : (
+                        <img
+                          src={previewUrl}
+                          alt="Document preview"
+                          className="max-w-full h-auto object-contain mx-auto shadow-sm rounded"
+                        />
+                      )}
                     </div>
                   </div>
                 )}
